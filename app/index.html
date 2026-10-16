@@ -2,26 +2,60 @@
 <html lang="es">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#8a3b12">
+  <meta name="description" content="Libros en voz alta, sin conexión.">
   <title>Lector</title>
+  <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icono.svg" type="image/svg+xml">
+  <link rel="icon" href="icono-32.png" sizes="32x32">
+  <link rel="apple-touch-icon" href="icono-180.png">
   <link rel="stylesheet" href="estilos.css">
 </head>
 <body>
-<main>
-  <h1>Lector</h1>
-  <p class="sub">Libros en voz alta, sin conexión.</p>
+<div id="vista"><main><p class="nota">Abriendo…</p></main></div>
 
-  <section class="tarjeta">
-    <h2>En construcción</h2>
-    <p>Ahora mismo estamos en la Fase 0: medir si este teléfono puede leer un
-      libro entero en voz alta, haciendo la voz en el momento y sin guardar
-      audio.</p>
+<dialog id="d-importa" aria-labelledby="di-titulo">
+  <form method="dialog">
+    <h2 id="di-titulo">Guardar el libro</h2>
+    <label class="campo" for="i-titulo">Título</label>
+    <input type="text" id="i-titulo" required>
+    <label class="campo" for="i-autor">Autor</label>
+    <input type="text" id="i-autor">
+    <label class="campo" for="i-lengua">Lengua (decide la voz)</label>
+    <select id="i-lengua"></select>
+    <p class="nota" id="i-resumen"></p>
     <div class="botones">
-      <a class="boton principal" href="pruebas.html">Abrir las pruebas de voz</a>
+      <button value="guarda" class="principal">Guardar</button>
+      <button value="cancela" formnovalidate>Cancelar</button>
     </div>
-  </section>
-</main>
+  </form>
+</dialog>
+
+<dialog id="d-indice" class="hoja" aria-labelledby="dx-titulo">
+  <div class="hoja-cabeza">
+    <h2 id="dx-titulo">Índice</h2>
+    <form method="dialog"><button class="icono" aria-label="Cerrar">×</button></form>
+  </div>
+  <nav id="indice-lista" class="indice"></nav>
+</dialog>
+
+<dialog id="d-voz" aria-labelledby="dv-titulo">
+  <h2 id="dv-titulo">Falta la voz</h2>
+  <p>Para oír este libro hace falta bajar la voz <b id="dv-nombre"></b>.</p>
+  <p class="nota" id="dv-estado"></p>
+  <div class="barra" id="dv-barra" hidden><div></div></div>
+  <div class="botones">
+    <button type="button" id="dv-baja" class="principal">Bajar la voz</button>
+    <form method="dialog"><button>Ahora no</button></form>
+  </div>
+  <p class="nota">Otra voz para esta lengua: en <a href="#/ajustes"
+    onclick="this.closest('dialog').close()">Ajustes</a>.</p>
+</dialog>
+
+<script src="voz.js"></script>
+<script src="biblioteca.js"></script>
+<script src="importar.js"></script>
+<script src="app.js"></script>
 </body>
 </html>

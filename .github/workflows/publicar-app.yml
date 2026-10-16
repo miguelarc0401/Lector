@@ -30,6 +30,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # la versión es el commit: cada publicación estrena caché en el
+      # service worker, y el teléfono se queda con la nueva al abrir
+      - name: Poner la versión
+        run: echo "self.VERSION = '${GITHUB_SHA::10}';" > app/version.js
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

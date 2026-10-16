@@ -62,4 +62,4 @@ git push
 if ($LASTEXITCODE -ne 0) { throw "git push fallo" }
 
 Write-Host "`nSubido. GitHub Pages tarda un par de minutos en republicar." -ForegroundColor Green
-Write-Host "Luego: https://miguelarc0401.github.io/Lector/pruebas.html"
+Write-Host "Luego: https://miguelarc0401.github.io/Lector/"

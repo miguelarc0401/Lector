@@ -115,7 +115,7 @@ textarea { min-height: 7rem; resize: vertical; }
   margin-top: .75rem;
 }
 
-button, a.boton {
+button, a.boton, label.boton {
   display: inline-flex;
   align-items: center;
   text-decoration: none;
@@ -130,7 +130,7 @@ button, a.boton {
   cursor: pointer;
 }
 
-button.principal, a.boton.principal {
+button.principal, a.boton.principal, label.boton.principal {
   background: var(--acento);
   border-color: var(--acento);
   color: var(--papel);
@@ -206,3 +206,290 @@ ol.pasos { padding-left: 1.3rem; margin: .4rem 0; }
 ol.pasos li { margin: .2rem 0; }
 
 [hidden] { display: none !important; }
+
+/* ------------------------------------------------------------- la app */
+
+input[type="text"]:focus-visible, a.boton:focus-visible {
+  outline: 3px solid var(--acento);
+  outline-offset: 2px;
+}
+
+button.icono, a.boton.icono {
+  min-width: 44px;
+  justify-content: center;
+  padding: .5rem;
+  font-size: 1.2rem;
+  line-height: 1;
+}
+
+label.boton { cursor: pointer; }
+
+.portadilla {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: .75rem;
+}
+
+/* La biblioteca */
+
+.fichas { list-style: none; margin: 1rem 0; padding: 0; }
+
+.ficha {
+  display: flex;
+  align-items: stretch;
+  background: var(--papel);
+  border: 1px solid var(--linea);
+  border-radius: 14px;
+  margin: .6rem 0;
+  box-shadow: var(--sombra);
+  overflow: hidden;
+}
+
+.ficha a.libro {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  gap: .8rem;
+  padding: .7rem;
+  color: inherit;
+  text-decoration: none;
+}
+
+.tapa {
+  flex: none;
+  width: 56px;
+  height: 80px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--acento-suave);
+  display: grid;
+  place-items: center;
+  color: var(--acento);
+  font: 600 1.6rem Georgia, serif;
+}
+
+.tapa img { width: 100%; height: 100%; object-fit: cover; }
+
+.datos { min-width: 0; display: flex; flex-direction: column; }
+.datos b { overflow-wrap: anywhere; }
+.datos .barra { height: 5px; margin: .4rem 0 .2rem; }
+
+.vivo { color: var(--acento); font-weight: 600; }
+
+.ficha .quita {
+  border: 0;
+  border-left: 1px solid var(--linea);
+  border-radius: 0;
+  background: none;
+  color: var(--tenue);
+  font-size: 1.3rem;
+  min-width: 48px;
+  justify-content: center;
+}
+
+/* El libro */
+
+.cabeza {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  padding: .5rem .75rem;
+  padding-top: max(.5rem, env(safe-area-inset-top));
+  background: var(--fondo);
+  border-bottom: 1px solid var(--linea);
+}
+
+.cabeza .rotulos {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+
+.cabeza .rotulos > * {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+main.lectura { padding-bottom: 9rem; }
+
+.texto {
+  font: 1.15rem/1.65 Georgia, "Times New Roman", serif;
+  hyphens: auto;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.texto p { margin: 0 0 .9em; cursor: pointer; }
+
+.texto h2, .texto h3, .texto h4 {
+  font-family: Georgia, "Times New Roman", serif;
+  line-height: 1.3;
+  margin: 1.6em 0 .7em;
+  cursor: pointer;
+}
+
+.texto h2 { font-size: 1.45rem; text-align: center; }
+.texto h3 { font-size: 1.25rem; }
+.texto h4 { font-size: 1.1rem; }
+
+.texto [data-i] {
+  scroll-margin-top: 5rem;
+  border-radius: 4px;
+  transition: box-shadow .2s;
+}
+
+.texto .sonando { box-shadow: -.6rem 0 0 -.35rem var(--acento); }
+
+::highlight(suena) {
+  background-color: var(--acento-suave);
+  color: var(--tinta);
+}
+
+button.tramo {
+  display: flex;
+  width: 100%;
+  justify-content: center;
+  margin: 1.5rem 0;
+  border-radius: 12px;
+  font-weight: 500;
+  color: var(--acento);
+}
+
+.mandos {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  background: var(--papel);
+  border-top: 1px solid var(--linea);
+  padding: .4rem 1rem;
+  padding-bottom: max(.6rem, env(safe-area-inset-bottom));
+  text-align: center;
+}
+
+.mandos p { margin: 0 0 .3rem; min-height: 1.2em; font-size: .88rem; }
+.mandos p:empty { display: none; }
+
+.mandos .fila {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.mandos button {
+  min-width: 52px;
+  min-height: 52px;
+  justify-content: center;
+  font-size: 1.2rem;
+}
+
+.mandos button.grande {
+  min-width: 64px;
+  min-height: 64px;
+  font-size: 1.5rem;
+}
+
+button.flota {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 7.5rem;
+  z-index: 3;
+  box-shadow: var(--sombra);
+}
+
+/* Los diálogos */
+
+dialog {
+  width: min(32rem, calc(100vw - 2rem));
+  border: 1px solid var(--linea);
+  border-radius: 16px;
+  background: var(--papel);
+  color: var(--tinta);
+  padding: 1.1rem;
+}
+
+dialog::backdrop { background: rgba(20, 15, 10, .45); }
+dialog form[method="dialog"] { margin: 0; }
+
+dialog.hoja {
+  width: min(36rem, 100vw);
+  max-width: 100vw;
+  max-height: 85vh;
+  margin: auto auto 0;
+  border-radius: 16px 16px 0 0;
+  padding: 0;
+  display: none;
+  flex-direction: column;
+}
+
+dialog.hoja[open] { display: flex; }
+
+.hoja-cabeza {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: .6rem .6rem .4rem 1.1rem;
+  border-bottom: 1px solid var(--linea);
+}
+
+.hoja-cabeza h2 { margin: 0; }
+
+.indice {
+  overflow-y: auto;
+  padding: .4rem .6rem 1.2rem;
+}
+
+.indice ul { list-style: none; margin: 0; padding: 0; }
+.indice ul ul { padding-left: 1.1rem; }
+
+.indice button {
+  width: 100%;
+  min-height: 44px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  font-weight: 400;
+  text-align: left;
+  padding: .4rem .5rem;
+}
+
+.indice button.actual {
+  background: var(--acento-suave);
+  font-weight: 600;
+}
+
+.indice summary {
+  display: flex;
+  align-items: center;
+  list-style: none;
+  cursor: pointer;
+}
+
+.indice summary::-webkit-details-marker { display: none; }
+
+.indice summary::after {
+  content: "▸";
+  flex: none;
+  width: 2.5rem;
+  text-align: center;
+  color: var(--tenue);
+}
+
+.indice details[open] > summary::after { content: "▾"; }
+
+/* Ajustes */
+
+.lengua + .lengua {
+  border-top: 1px solid var(--linea);
+  margin-top: .8rem;
+  padding-top: .2rem;
+}

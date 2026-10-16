@@ -174,26 +174,49 @@ Un banco de pruebas (`app/pruebas.html`) para medir en **tu teléfono** lo que
 puede tumbar el diseño:
 
 - [ ] Bajar las voces candidatas y oír la misma frase en cada una.
-- [ ] Medir cuánto más deprisa hace la voz de lo que la dice, con la pantalla
+- [x] Medir cuánto más deprisa hace la voz de lo que la dice, con la pantalla
       encendida.
 - [ ] **Escucha larga**: un texto largo, en vivo, 30 minutos con la pantalla
       apagada; al volver, el informe dice cuántas veces se calló, cuánto, y a
       qué ritmo hizo la voz con la pantalla encendida y con la apagada.
-- [ ] Publicarlo en GitHub Pages para abrirlo en el teléfono (la caché de la
+      *(Hecha de 6 minutos; falta la de 30.)*
+- [x] Publicarlo en GitHub Pages para abrirlo en el teléfono (la caché de la
       voz pide `https`).
 
 **Listo cuando:** sabemos la voz, y si con la pantalla apagada aguanta media
 hora sin cortes.
 
+**Primera medida (16-10-2026, Android 10, Chrome 155, `es_MX-claude-high`):**
+3,7× con la pantalla encendida y **2,4× con la apagada**, 0 cortes, 28 MB de
+memoria como mucho. Con la pantalla apagada el adelanto *crecía*. Leer en el
+momento, sin guardar audio, funciona en este teléfono incluso con la voz de
+más calidad. No hace falta la voz ligera ni la app nativa.
+
 ### Fase 1 — Esqueleto y primer libro (EPUB y TXT)
 
-- [ ] PWA (`index.html`, `sw.js`, manifest) y biblioteca en IndexedDB.
-- [ ] Importar EPUB y TXT, con su árbol de capítulos y su idioma.
-- [ ] Vista de lectura, índice, tocar un párrafo → leer desde ahí, resaltado.
-- [ ] Recordar la posición.
+- [x] PWA (`index.html`, `sw.js`, manifest) y biblioteca en IndexedDB.
+- [x] Importar EPUB y TXT, con su árbol de capítulos y su idioma.
+- [x] Vista de lectura, índice, tocar un párrafo → leer desde ahí, resaltado.
+- [x] Recordar la posición.
 
 **Listo cuando:** abro un EPUB en el teléfono, veo su índice, toco un párrafo
 del capítulo 5 y lo lee, sin red.
+
+**Hecho (16-10-2026), probado en la computadora con libros de prueba** y la
+voz simulada; falta la prueba de verdad: en el teléfono, con un EPUB tuyo.
+Cómo quedó:
+
+- `importar.js`: el EPUB se abre sin librerías (Chrome descomprime solo);
+  índice de `nav.xhtml` o `toc.ncx`, portada, lengua de `dc:language`. Las
+  notas y sus llamadas no se leen. El TXT acepta UTF-8 o Windows-1252, une
+  los renglones cortados y busca «Capítulo», «Parte», romanos y `#`.
+- `biblioteca.js`: IndexedDB, con el texto aparte de la ficha del libro.
+- `app.js`: el libro se pinta por tramos de hasta 500 párrafos, cortados por
+  capítulos; tocar una frase lee desde esa frase; la vista sigue a la voz
+  hasta que se mueve el texto con el dedo («Ir a lo que suena»). La posición
+  se guarda por párrafo y frase.
+- `voz.js`: no parte la frase en «Sr. Gómez» ni en las iniciales.
+- `sw.js`: la caché se llama por el commit, que pone GitHub Actions.
 
 ### Fase 2 — Escucha larga (coche, bolsillo, cama)
 

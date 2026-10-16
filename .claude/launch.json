@@ -6,6 +6,13 @@
       "runtimeExecutable": "python",
       "runtimeArgs": ["-m", "http.server", "8780", "--directory", "app"],
       "port": 8780
+    },
+    {
+      "name": "lector-2",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "8782", "--directory", "app"],
+      "port": 8782,
+      "autoPort": false
     }
   ]
 }

@@ -153,28 +153,58 @@
     const parrafos = /\n\s*\n/.test(limpio)
       ? limpio.split(/\n\s*\n/)
       : limpio.split('\n');
+    return deParrafos(parrafos.map((par) => par.replace(/-\n(?=\p{Ll})/gu, '')
+      .replace(/\s+/g, ' ').trim()).filter(Boolean), lengua);
+  }
+
+  /** Lo mismo, de una lista de párrafos ya separados —los de un libro—: el
+   *  `parrafo` de cada trozo es su lugar en la lista. Cada trozo es un
+   *  pedazo literal de su párrafo, ya con los espacios apretados, para que
+   *  quien lo enseña pueda encontrarlo y resaltarlo. */
+  function deParrafos(lista, lengua) {
     const r = [];
-    let p = 0;
-    for (const par of parrafos) {
-      const t = par.replace(/-\n(?=\p{Ll})/gu, '').replace(/\s*\n\s*/g, ' ')
-        .replace(/\s+/g, ' ').trim();
-      if (!t) continue;
+    lista.forEach((par, p) => {
+      const t = String(par).replace(/\s+/g, ' ').trim();
+      if (!t) return;
       const fs = frases(t, lengua).flatMap(parte);
       fs.forEach((f, j) => r.push({ texto: f, parrafo: p, fin: j === fs.length - 1 }));
-      p++;
-    }
+    });
     return r;
   }
 
+  const _segmentadores = {};
+
+  /* Abreviaturas tras las que el punto no cierra la frase: el segmentador
+   * de Chrome corta en «Sr. Gómez» y la voz haría una pausa en medio. Y la
+   * inicial suelta de un nombre, «J. R. Jiménez». */
+  const ABREVIA = new RegExp('(?:^|\\s)(?:sr|sra|srta|d|dña|dr|dra|lic|ing|prof|'
+    + 'sto|sta|fr|mons|gral|mr|mrs|ms|st|mme|mlle|hr|sig|vd|ud|uds|vds|art|'
+    + 'núm|vol|cf|vs|et al|p\\. ?ej)\\.$', 'i');
+  const INICIAL = /(?:^|\s)\p{Lu}\.$/u;
+
   function frases(t, lengua) {
+    let r = null;
     if (window.Intl && Intl.Segmenter) {
       try {
-        const s = new Intl.Segmenter(lengua || 'es', { granularity: 'sentence' });
-        return Array.from(s.segment(t), (x) => x.segment.trim()).filter(Boolean);
+        const l = lengua || 'es';
+        const s = _segmentadores[l]
+          || (_segmentadores[l] = new Intl.Segmenter(l, { granularity: 'sentence' }));
+        r = Array.from(s.segment(t), (x) => x.segment.trim()).filter(Boolean);
       } catch (_) { /* esa lengua no la sabe: va la regla de abajo */ }
     }
-    return (t.match(/[^.!?…]+(?:[.!?…]+["'»”’)\]]*|$)/g) || [t])
-      .map((x) => x.trim()).filter(Boolean);
+    if (!r) {
+      r = (t.match(/[^.!?…]+(?:[.!?…]+["'»”’)\]]*|$)/g) || [t])
+        .map((x) => x.trim()).filter(Boolean);
+    }
+    // se vuelve a pegar lo que se partió tras una abreviatura: entre las dos
+    // había un espacio y nada más, así que sigue siendo un pedazo literal
+    const u = [];
+    for (const f of r) {
+      const ant = u[u.length - 1];
+      if (ant && (ABREVIA.test(ant) || INICIAL.test(ant))) u[u.length - 1] += ' ' + f;
+      else u.push(f);
+    }
+    return u;
   }
 
   function parte(f) {
@@ -468,7 +498,9 @@
     a.addEventListener('ended', () => { if (g === S.gen) acabo(k, r); });
     a.addEventListener('error', () => { if (g === S.gen) acabo(k, r); });
     if (S.estado === 'pausada') return;
-    a.play().catch(() => { if (g === S.gen) acabo(k, r); });
+    // `suena`: que ya se oye, para quien enseña «Preparando la voz…»
+    a.play().then(() => { if (g === S.gen) emite('suena', k); })
+      .catch(() => { if (g === S.gen) acabo(k, r); });
   }
 
   function acabo(k, r) {
@@ -627,7 +659,7 @@
   window.Voz = {
     VOCES: VOCES, LENGUAS: LENGUAS, lenguaDe: lenguaDe,
     hay: hay, baja: baja, quita: quita, prueba: prueba,
-    trocea: trocea,
+    trocea: trocea, deParrafos: deParrafos,
     lee: lee, pausa: pausa, sigue: sigue, para: para, ve: ve, cambia: cambia,
     estado: estado, on: on, ultimoInforme: ultimoInforme
   };
