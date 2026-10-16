@@ -1,0 +1,9 @@
+# Los libros de prueba no van al repositorio: son tuyos, y pesan.
+libros/
+*.pdf
+*.epub
+*.docx
+
+__pycache__/
+.DS_Store
+Thumbs.db

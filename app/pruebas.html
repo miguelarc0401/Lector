@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#8a3b12">
+  <title>Pruebas de voz</title>
+  <link rel="icon" href="icono.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="estilos.css">
+</head>
+<body>
+<main>
+  <h1>Pruebas de voz</h1>
+  <p class="sub">Fase 0 de Lector: medir en este teléfono si la voz aguanta un
+    libro entero, leyendo en el momento y sin guardar audio.</p>
+
+  <section class="tarjeta">
+    <h2>1. La voz</h2>
+    <label class="campo" for="voz">Voz</label>
+    <select id="voz"></select>
+    <p id="voz-estado" class="nota">Mirando si está bajada…</p>
+    <div class="barra" id="voz-barra" hidden><div></div></div>
+    <div class="botones">
+      <button type="button" id="b-baja" class="principal" hidden>Bajar la voz</button>
+      <button type="button" id="b-prueba" disabled>Probar</button>
+      <button type="button" id="b-quita" hidden>Quitarla</button>
+    </div>
+    <p id="voz-medida"></p>
+    <label class="campo" for="vel">Velocidad</label>
+    <select id="vel">
+      <option value="0.8">Más despacio (0,8)</option>
+      <option value="0.9">Un poco más despacio (0,9)</option>
+      <option value="1" selected>Normal</option>
+      <option value="1.1">Un poco más deprisa (1,1)</option>
+      <option value="1.25">Más deprisa (1,25)</option>
+      <option value="1.5">Mucho más deprisa (1,5)</option>
+    </select>
+  </section>
+
+  <section class="tarjeta">
+    <h2>2. Comparar voces</h2>
+    <p class="nota">La misma frase, dicha por cada voz ya bajada de la misma
+      lengua, una detrás de otra, con lo que tarda cada una en este teléfono.</p>
+    <div class="botones">
+      <button type="button" id="b-compara">Oírlas todas</button>
+    </div>
+    <p id="compara-estado" class="nota"></p>
+  </section>
+
+  <section class="tarjeta">
+    <h2>3. Escucha larga</h2>
+    <ol class="pasos">
+      <li>Pulsa <b>Empezar</b> y deja la pantalla encendida un par de minutos:
+        es cuando la voz toma ventaja.</li>
+      <li>Apaga la pantalla y guarda el teléfono unos 30 minutos. Si se calla,
+        no lo toques; fíjate más o menos cuándo.</li>
+      <li>Vuelve, enciende la pantalla y copia el informe de abajo.</li>
+    </ol>
+    <label class="campo" for="fuente">Texto</label>
+    <select id="fuente">
+      <option value="prueba">El texto de prueba (más de media hora)</option>
+      <option value="txt">Un archivo TXT tuyo…</option>
+      <option value="pega">Pegar un texto</option>
+    </select>
+    <input type="file" id="txt" accept=".txt,text/plain" hidden>
+    <textarea id="pega" hidden placeholder="Pega aquí un capítulo"></textarea>
+    <p id="texto-estado" class="nota"></p>
+    <label class="campo" for="delante">Adelanto en memoria, como mucho</label>
+    <select id="delante">
+      <option value="60">1 minuto (la prueba más dura)</option>
+      <option value="300">5 minutos</option>
+      <option value="600">10 minutos</option>
+      <option value="1200" selected>20 minutos</option>
+      <option value="1800">30 minutos</option>
+    </select>
+    <div class="botones">
+      <button type="button" id="b-empieza" class="principal">Empezar</button>
+      <button type="button" id="b-pausa" disabled>Pausa</button>
+      <button type="button" id="b-para" disabled>Parar</button>
+    </div>
+    <div class="ahora" id="ahora">—</div>
+    <div class="botones" id="saltos" hidden>
+      <button type="button" id="b-atras">◀ Frase anterior</button>
+      <button type="button" id="b-adelante">Frase siguiente ▶</button>
+    </div>
+    <div class="cifras" id="cifras"></div>
+  </section>
+
+  <section class="tarjeta">
+    <h2>Informe</h2>
+    <pre class="informe" id="informe">Todavía no hay ninguna prueba.</pre>
+    <div class="botones">
+      <button type="button" id="b-copia">Copiar el informe</button>
+    </div>
+  </section>
+
+  <p class="nota"><a href="./">← Lector</a></p>
+</main>
+<script src="voz.js"></script>
+<script src="pruebas.js"></script>
+</body>
+</html>

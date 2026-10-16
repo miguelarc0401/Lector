@@ -1,0 +1,46 @@
+name: Publicar la app
+
+# Cada vez que cambie algo dentro de app/ y se suba a main, GitHub vuelve a
+# publicar la carpeta en GitHub Pages. No compila nada: app/ ya lleva dentro
+# todo lo que necesita.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'app/**'
+      - '.github/workflows/publicar-app.yml'
+  workflow_dispatch:          # y a mano, desde la pestaña Actions
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Si se suben dos cambios seguidos, se publica el último y se cancela el otro.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+# En dos trabajos, como en Liturgicum: así «Re-run» del fallido reintenta
+# sólo «publicar», que no sube nada, y no quedan dos artefactos con el mismo
+# nombre.
+jobs:
+  construir:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: app
+
+  publicar:
+    needs: construir
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.despliegue.outputs.page_url }}
+    steps:
+      - id: despliegue
+        uses: actions/deploy-pages@v4

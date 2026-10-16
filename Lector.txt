@@ -1,0 +1,4 @@
+El objetivo es hacer un programa para leer libros en alta voz. podemos usar Piper o algo mejor que se te ocurra. 
+Quiero poder subir un archivo de texto (un libro), (si es pdf que le haga ocr y luego lo extraiga en un word u otro archivo). Pero quiero que en la app aparezca el libro dividido en sus capítulos y secciones según su propio índice y que pueda reproducirlo desde el punto que yo quiera.
+Esa es la idea básica. Quiero que sea posible hacerse la lectura en voz alta sin conexión a internet, algo así como lo que estamos haciendo en el proyecto de LITURGICUM.
+Si tienes alguna mejor idea de cómo hacer el programa avísame.
