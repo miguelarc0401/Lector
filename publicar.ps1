@@ -2,7 +2,7 @@
 #
 #   1. sube los cambios a GitHub
 #   2. GitHub Actions republica app/ en GitHub Pages (un par de minutos)
-#   3. el telefono abre https://miguelarc0401.github.io/lector/
+#   3. el telefono abre https://miguelarc0401.github.io/Lector/
 #
 # Es el de Liturgicum sin los pasos de datos: Lector no tiene nada que
 # rehacer antes de subir, los libros viven en el telefono.
@@ -62,4 +62,4 @@ git push
 if ($LASTEXITCODE -ne 0) { throw "git push fallo" }
 
 Write-Host "`nSubido. GitHub Pages tarda un par de minutos en republicar." -ForegroundColor Green
-Write-Host "Luego: https://miguelarc0401.github.io/lector/pruebas.html"
+Write-Host "Luego: https://miguelarc0401.github.io/Lector/pruebas.html"

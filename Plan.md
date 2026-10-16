@@ -19,7 +19,7 @@ sección «Rezarla en alta voz» de su `LEEME.md`.
   va más rápido); el libro ya pasado por OCR se exporta a EPUB y se abre en
   el teléfono.
 - **Se publica en el mismo GitHub que Liturgicum**:
-  `miguelarc0401.github.io/lector/`.
+  `miguelarc0401.github.io/Lector/`.
 - **No se guarda audio en el teléfono. Se lee en el momento.** Lo único que se
   baja es la voz misma (el modelo de Piper, una vez); el audio se hace mientras
   se escucha, vive solo en memoria y se suelta en cuanto suena.
