@@ -43,6 +43,7 @@ const DESPUES = [
   'icono-512.png',
   'icono-maskable-512.png',
   'pruebas.html',
+  'privacidad.html',
   'pruebas.js'
 ];
 

@@ -935,7 +935,8 @@
     let h = '<h2>Sincronizar con Google Drive</h2>'
       + '<p class="nota">Los libros que abras aquí salen también en tus otros aparatos, '
       + 'con la frase por la que vas. Se guardan en una carpeta oculta de tu Drive que '
-      + 'sólo ve Lector. Sin conexión todo sigue igual: se pone al día después.</p>';
+      + 'sólo ve Lector. Sin conexión todo sigue igual: se pone al día después. '
+      + '<a href="privacidad.html">Privacidad</a>.</p>';
     if (!e.disponible) {
       h += '<p class="nota">Todavía no se puede: falta el ID de cliente de Google (Plan.md §6).</p>';
     } else if (!e.conectada) {

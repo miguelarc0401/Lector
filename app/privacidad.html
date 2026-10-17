@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#8a3b12">
+  <title>Lector · Privacidad</title>
+  <link rel="icon" href="icono.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="estilos.css">
+  <style>code { overflow-wrap: anywhere; } .portadilla .boton { white-space: nowrap; }</style>
+</head>
+<body>
+<main>
+  <header class="portadilla"><div><h1>Privacidad</h1>
+    <p class="sub">Lector: libros en voz alta, sin conexión.</p></div>
+    <a class="boton" href="./">← Lector</a></header>
+
+  <section class="tarjeta">
+    <h2>En pocas palabras</h2>
+    <p>Lector no tiene servidor propio ni recoge datos de nadie. Los libros y por
+      dónde vas se guardan en tu aparato y, si lo conectas, en tu propio Google
+      Drive. Nadie más los ve.</p>
+  </section>
+
+  <section class="tarjeta">
+    <h2>Lo que se guarda en tu aparato</h2>
+    <p>Los libros que abres (el archivo y su texto), la frase por la que vas, tus
+      ajustes y las voces que bajas. Se guardan en el navegador de ese aparato y
+      no salen de él, salvo lo que se explica abajo si conectas Google Drive.
+      La voz se hace en el propio aparato: el texto no se manda a ningún sitio
+      para leerlo en voz alta.</p>
+  </section>
+
+  <section class="tarjeta">
+    <h2>Si conectas Google Drive</h2>
+    <p>Es opcional, y sirve para que tus libros salgan en tus otros aparatos.
+      Lector pide un solo permiso,
+      <code>https://www.googleapis.com/auth/drive.appdata</code>, que le deja
+      usar una carpeta oculta de tu Drive reservada para Lector. Con él,
+      Lector <b>no puede ver ni tocar ningún otro archivo</b> de tu Drive.</p>
+    <p>En esa carpeta guarda, por cada libro: el archivo que abriste (EPUB o
+      TXT), su título, autor y lengua, y la frase por la que vas. Nada más. No
+      pide tu nombre, tu correo ni tus contactos.</p>
+    <p>Tu aparato habla directamente con Google; los datos no pasan por ningún
+      servidor del autor de Lector, y el autor no tiene acceso a ellos. El
+      permiso que da Google dura una hora y se guarda sólo en tu aparato.</p>
+    <p>El uso que hace Lector de la información recibida de las API de Google
+      se ajusta a la
+      <a href="https://developers.google.com/terms/api-services-user-data-policy">Política
+      de datos de usuario de los servicios de API de Google</a>, incluidos los
+      requisitos de uso limitado. Esa información sólo se usa para mostrarte
+      tus libros en tus aparatos: no se vende, no se comparte con nadie y no se
+      usa para publicidad.</p>
+  </section>
+
+  <section class="tarjeta">
+    <h2>Cómo borrarlo</h2>
+    <p>En el aparato: quita los libros desde la biblioteca, o borra los datos del
+      sitio en el navegador. En Ajustes, «Desconectar» olvida el permiso de
+      Google en ese aparato.</p>
+    <p>En Drive: Google Drive → Configuración → Administrar aplicaciones →
+      Lector → Opciones → «Eliminar datos ocultos de la aplicación». Para
+      quitarle el permiso a Lector:
+      <a href="https://myaccount.google.com/connections">myaccount.google.com/connections</a>.</p>
+  </section>
+
+  <section class="tarjeta">
+    <h2>Sin publicidad ni rastreo</h2>
+    <p>Lector no usa cookies, ni estadísticas, ni publicidad, ni servicios de
+      terceros aparte de Google Drive (si lo conectas) y la descarga de las voces
+      (Hugging Face, jsDelivr y cdnjs) la primera vez.</p>
+  </section>
+
+  <section class="tarjeta">
+    <h2>Contacto</h2>
+    <p>Para cualquier pregunta: <a href="mailto:miguelarc.0401@gmail.com">miguelarc.0401@gmail.com</a>.</p>
+    <p class="nota">Última actualización: 17 de octubre de 2026.</p>
+  </section>
+</main>
+</body>
+</html>
