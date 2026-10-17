@@ -291,6 +291,19 @@ label.boton { cursor: pointer; }
   justify-content: center;
 }
 
+/* La nube, debajo de «Abrir un libro» */
+
+.nube {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .6rem;
+  margin: .4rem 0;
+}
+.nube span { font-size: .92rem; }
+.nube button { flex: none; }
+.nube[hidden] { display: none; }
+
 /* El libro */
 
 .cabeza {

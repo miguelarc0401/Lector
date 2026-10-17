@@ -333,3 +333,161 @@ Hay dos caminos, y el código que se haga ahora sirve para los dos:
 
 Por eso el motor de la voz va aparte desde el principio (`voz.js` habla con
 `piper.js` por mensajes): cambiar el motor no toca el resto de la app.
+
+---
+
+## 6. La misma biblioteca en el PC y en el teléfono (Google Drive)
+
+**Aprobado (17-10-2026) y hecho; falta el ID de cliente de Google.** Abrir un libro en
+el PC y que salga también en el teléfono, con su posición. Es **opcional**:
+sin conectar Google, la app sigue igual que ahora, y conectada sigue
+funcionando sin red; lo de Drive se pone al día cuando la hay.
+
+### Dónde se guarda
+
+En la **carpeta oculta de la app en tu Google Drive** (`appDataFolder`):
+una carpeta que sólo ve Lector, que no aparece en drive.google.com (sí cuenta
+en tus 15 GB). Lector no puede ver nada más
+de tu Drive: el permiso que pide (`drive.appdata`) es sólo esa carpeta. Ni
+el repositorio ni GitHub Pages llevan nunca un libro; no hay servidor
+nuestro: el teléfono habla con Google directamente.
+
+Por cada libro, dos archivos:
+
+```
+ appDataFolder/
+   <id>.epub           el archivo tal como se abrió (EPUB, TXT o MD)
+   <id>.json           la ficha: título, autor, lengua (lo que se cambió al
+                       guardarlo), formato, nombre del archivo, n.º de párrafos,
+                       huella (SHA-256 del archivo)
+                       y en sus «appProperties»: pos, leeNotas, cambiado
+                       (la hora del último cambio), borrado
+```
+
+La posición va en las *appProperties* de la ficha (unos bytes que Drive
+guarda junto al archivo): así **ponerse al día es una sola petición** (la
+lista de archivos ya las trae) y mandar la posición es otra, sin subir nada.
+
+### Cómo se sincroniza
+
+Al abrir la app, al volver a ella, y tocando «Sincronizar»:
+
+1. Se pide la lista de la carpeta.
+2. **Libros de aquí que no están en Drive** → se suben (archivo + ficha).
+3. **Libros de Drive que no están aquí** → se bajan y se abren con el mismo
+   `importar.js` que si se abrieran a mano; título, autor, lengua y posición
+   salen de la ficha.
+4. **Libros en los dos** → gana la posición **más reciente** (`cambiado`):
+   o se apunta aquí, o se manda a Drive. La posición sólo se copia si el
+   libro tiene el mismo número de párrafos en los dos (si una versión nueva
+   de la app partiera el libro distinto, `pos` señalaría otra frase).
+5. Mientras se lee, la posición cambia en cada frase: a Drive se manda como
+   mucho **una vez por minuto**, y al salir de la app (o apagar la pantalla)
+   una última vez.
+
+Detalles:
+
+- **El mismo libro abierto en los dos aparatos** (antes de conectar): se
+  reconoce por la huella y queda uno solo, con la posición más reciente.
+- **Quitar un libro** pregunta: «Sólo de este aparato» (no se vuelve a bajar
+  aquí, sigue en los demás) o «De todos» (se borra de Drive y, al
+  sincronizar, de los otros aparatos).
+- **Para poder subirlo, ahora se guarda también el archivo original** en el
+  teléfono (un almacén nuevo, `archivos`; un EPUB son pocos MB). Los libros
+  abiertos antes de esto no lo tienen: se quedan sólo en su aparato hasta que
+  se vuelva a abrir su archivo, y entonces se reconocen (mismo nombre y mismos
+  párrafos) y conservan su posición.
+- **Sin red, o sin sesión**: nada se rompe ni espera; los cambios se mandan
+  la próxima vez.
+- **Desconectar** (en Ajustes) olvida la sesión en ese aparato; los libros se
+  quedan. Para borrar lo de Drive del todo: Drive → Configuración →
+  Administrar aplicaciones → Lector → «Eliminar datos ocultos».
+
+### Entrar con Google
+
+Una vez por aparato, en **Ajustes → Sincronizar con Google Drive →
+Conectar**. Se abre la ventana de Google, eliges tu cuenta y aceptas; vuelve
+sola a Lector.
+
+- **Sin servidor no hay sesión larga.** Google da a una app así (sin
+  servidor) un permiso que dura **una hora**; renovarlo no vuelve a preguntar
+  nada, pero tiene que empezar con un toque (el navegador no deja abrir la
+  ventana de Google sin tocar). Así que:
+  - con el permiso vigente, todo va solo (al abrir, al leer, al salir);
+  - si ha caducado, en la biblioteca aparece **«☁ Sincronizar»**: un toque, la
+    ventana de Google se abre y se cierra sola en un segundo, y se pone al
+    día.
+  Para que fuera del todo automático haría falta un servidor propio que
+  guarde el permiso largo; no lo propongo.
+- **Cómo se entra:** con la dirección de Google para apps web sin servidor
+  (`response_type=token`, la misma que usa por dentro su librería «Google
+  Identity Services»), y una página pequeña, `oauth.html`, que recibe el
+  permiso y se lo pasa a la app. Sin cargar la librería de Google: una cosa
+  menos que bajar, y funciona también en la app instalada en Android, donde
+  las ventanas emergentes de esa librería a veces no vuelven.
+
+### Lo que hay que hacer en Google Cloud (tú, una vez, ~10 min)
+
+En <https://console.cloud.google.com>, con tu cuenta de Google:
+
+1. **Proyecto nuevo**: «Lector».
+2. **APIs y servicios → Biblioteca → «Google Drive API» → Habilitar.**
+3. **Google Auth Platform** (antes «Pantalla de consentimiento de OAuth»):
+   - *Branding*: nombre «Lector», tu correo de asistencia y de contacto.
+   - *Público*: **Externo**. Después, **«Publicar app»** (pasar de «Prueba»
+     a «En producción»). Con sólo `drive.appdata`, que Google cuenta como
+     permiso *no sensible*, no hace falta que Google revise la app. Si la
+     primera vez sale «Google no ha verificado esta app», se pasa con
+     «Avanzado → Ir a Lector». (Si prefieres dejarla «En prueba», añade
+     tu correo como usuario de prueba: también vale.)
+   - *Acceso a datos*: añadir el permiso
+     `https://www.googleapis.com/auth/drive.appdata`.
+4. **Clientes → Crear cliente → «Aplicación web»**:
+   - *Orígenes de JavaScript autorizados*: `https://miguelarc0401.github.io`
+   - *URI de redireccionamiento autorizados*:
+     `https://miguelarc0401.github.io/Lector/oauth.html`
+5. Copiar el **ID de cliente** (`….apps.googleusercontent.com`) y pasármelo.
+   Ese ID es público (va en `app/nube.js`); el «secreto del cliente» no se
+   usa ni hay que ponerlo en ningún sitio.
+
+### Las piezas
+
+- `app/nube.js` (nuevo): la sesión (pedir el permiso, recordarlo hasta que
+  caduca) y la sincronización, hablando con la API REST de Drive con
+  `fetch`.
+- `app/oauth.html` (nuevo): recibe el permiso de Google y se lo pasa a la app.
+- `biblioteca.js`: el almacén `archivos`; `cambiado` cada vez que cambian
+  `pos` o `leeNotas`; la huella.
+- `app.js`: la tarjeta de Ajustes, «☁ Sincronizar» en la biblioteca, quitar
+  de aquí o de todos, y guardar el archivo al abrir un libro.
+- `sw.js`: los dos ficheros nuevos en la caché.
+
+### Cómo se prueba
+
+En la computadora, **sin Google**: un Drive de mentira
+(`herramientas/drive_falso.py`, que contesta como la API de Drive en
+`localhost`) y dos «aparatos», la app en los puertos 8780 y 8782 (cada uno
+con su biblioteca). Se abre un libro en uno, aparece en el otro; se lee en
+el otro, la posición vuelve al primero; quitar de aquí / de todos; sin red.
+Después, **con Google de verdad**: tú entras en el PC y en el teléfono, y el
+EPUB de la *Historia de la Iglesia III* abierto en el PC tiene que salir en
+el teléfono.
+
+- [x] Diseño aprobado.
+- [ ] Proyecto en Google Cloud y el ID de cliente (va en `CLIENTE`, al
+      principio de `app/nube.js`).
+- [x] `nube.js`, `oauth.html` y los cambios; probado con el Drive de mentira.
+
+**Probado (17-10-2026) con el Drive de mentira**, «PC» en 8780 y «teléfono»
+en 8782: conectar; abrir un EPUB en el PC → sube archivo y ficha; conectar
+el teléfono → el mismo EPUB, que el teléfono ya tenía de antes (sin
+archivo), se reconoce y conserva su posición, y el libro que sólo tenía el
+teléfono sube; la posición del teléfono llega al PC al abrirlo, y el PC
+baja el libro del teléfono; permiso caducado → «Para traer lo de tus otros
+aparatos, toca Sincronizar» → un toque y al día; «Sólo de este aparato» no
+se vuelve a bajar; «De todos» desaparece del otro al sincronizar; sin
+Drive, «Sin conexión con Drive: se pondrá al día luego» y los libros se
+abren igual. Lo que no se ha podido probar sin Google: la ventana de Google
+de verdad (aquí se abrió en la misma página y volvió sola) y la app
+instalada en el teléfono.
+- [ ] Probado con Google en el PC y en el teléfono.

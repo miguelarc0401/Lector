@@ -4,14 +4,36 @@
     {
       "name": "lector",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "http.server", "8780", "--directory", "app"],
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8780",
+        "--directory",
+        "app"
+      ],
       "port": 8780
     },
     {
       "name": "lector-2",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "http.server", "8782", "--directory", "app"],
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8782",
+        "--directory",
+        "app"
+      ],
       "port": 8782,
+      "autoPort": false
+    },
+    {
+      "name": "drive-falso",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "herramientas/drive_falso.py",
+        "8790"
+      ],
+      "port": 8790,
       "autoPort": false
     }
   ]

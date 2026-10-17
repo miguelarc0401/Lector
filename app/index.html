@@ -53,9 +53,22 @@
     onclick="this.closest('dialog').close()">Ajustes</a>.</p>
 </dialog>
 
+<dialog id="d-quita" aria-labelledby="dq-titulo">
+  <form method="dialog">
+    <h2 id="dq-titulo">¿Quitar el libro?</h2>
+    <p class="nota">Está también en tu Google Drive, para tus otros aparatos.</p>
+    <div class="botones">
+      <button value="aqui" class="principal">Sólo de este aparato</button>
+      <button value="todos">De todos</button>
+      <button value="cancela">Cancelar</button>
+    </div>
+  </form>
+</dialog>
+
 <script src="voz.js"></script>
 <script src="biblioteca.js"></script>
 <script src="importar.js"></script>
+<script src="nube.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

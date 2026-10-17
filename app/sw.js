@@ -8,7 +8,8 @@
  * Sólo toca sus propias cachés, las `lector-*`. La de la voz, `voz-piper`,
  * la lleva piper.js, y es la misma que la de Liturgicum —las dos apps viven
  * en el mismo sitio—: la voz se baja una vez para las dos. Los libros no
- * están aquí sino en IndexedDB (biblioteca.js).
+ * están aquí sino en IndexedDB (biblioteca.js), y Drive (nube.js) es de
+ * otro origen: no pasa por aquí.
  *
  * En la computadora, al probar (localhost), va a la red primero: si no,
  * cada cambio pediría recargar dos veces.
@@ -26,6 +27,8 @@ const FICHEROS = [
   'voz.js',
   'biblioteca.js',
   'importar.js',
+  'nube.js',
+  'oauth.html',
   'piper.js',
   'version.js',
   'manifest.webmanifest',
