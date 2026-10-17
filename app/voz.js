@@ -132,8 +132,8 @@
    *  la voz en memoria, y eso no es lo que tarda leyendo. */
   async function prueba(id, texto, vel) {
     const p = partes(id);
-    const q = { tipo: 'di', voz: p.voz, hablante: p.hablante, texto: texto,
-      vel: vel || 1 };
+    const q = { tipo: 'di', voz: p.voz, hablante: p.hablante,
+      texto: paraDecir(texto, lenguaDe(id)), vel: vel || 1 };
     await pide(q);
     W.cargada = p.voz;
     const r = await pide(q);
@@ -223,6 +223,116 @@
     }
     if (f) r.push(f);
     return r;
+  }
+
+  /* ------------------------------------------------ decirlo como se lee */
+
+  /* Los números romanos, como los dice quien lee en voz alta: «Felipe IV» es
+   * «Felipe cuarto», «Juan XXII», «Juan veintidós», «siglo XIV», «siglo
+   * catorce». Espeak los diría letra por letra. Sólo cambia lo que se le da
+   * a Piper: el texto del trozo se queda tal cual, que es el que se resalta
+   * en pantalla. */
+  // sin \b, que no tiene por letras las acentuadas: la D de «Délicieux»
+  // pasaría por un quinientos
+  const ROMANO = /(?<![\p{L}\p{N}])(?=[IVXLCDM])M{0,3}(?:CM|CD|D?C{0,3})(?:XC|XL|L?X{0,3})(?:IX|IV|V?I{0,3})(?![\p{L}\p{N}])/gu;
+  const VALOR = { I: 1, V: 5, X: 10, L: 50, C: 100, D: 500, M: 1000 };
+
+  function valor(r) {
+    let n = 0;
+    for (let i = 0; i < r.length; i++) {
+      const v = VALOR[r[i]], s = VALOR[r[i + 1]] || 0;
+      n += v < s ? -v : v;
+    }
+    return n;
+  }
+
+  const UNIDADES = ('cero uno dos tres cuatro cinco seis siete ocho nueve diez once doce '
+    + 'trece catorce quince dieciséis diecisiete dieciocho diecinueve veinte veintiuno '
+    + 'veintidós veintitrés veinticuatro veinticinco veintiséis veintisiete veintiocho '
+    + 'veintinueve').split(' ');
+  const DECENAS = ['', '', '', 'treinta', 'cuarenta', 'cincuenta', 'sesenta', 'setenta',
+    'ochenta', 'noventa'];
+  const CENTENAS = ['', 'ciento', 'doscientos', 'trescientos', 'cuatrocientos',
+    'quinientos', 'seiscientos', 'setecientos', 'ochocientos', 'novecientos'];
+
+  /** Un número de 1 a 3999, en letra. */
+  function enLetra(n) {
+    if (n >= 1000) {
+      const m = Math.floor(n / 1000), r = n % 1000;
+      return (m === 1 ? 'mil' : enLetra(m) + ' mil') + (r ? ' ' + enLetra(r) : '');
+    }
+    if (n >= 100) {
+      const r = n % 100;
+      return (n === 100 ? 'cien' : CENTENAS[Math.floor(n / 100)]) + (r ? ' ' + enLetra(r) : '');
+    }
+    if (n < 30) return UNIDADES[n];
+    return DECENAS[Math.floor(n / 10)] + (n % 10 ? ' y ' + UNIDADES[n % 10] : '');
+  }
+
+  const ORDINAL = ['', 'primer', 'segund', 'tercer', 'cuart', 'quint', 'sext', 'séptim',
+    'octav', 'noven', 'décim'];
+
+  /* Reyes, papas, concilios: ordinal hasta el diez («Clemente quinto»,
+   * «Isabel segunda»), y de ahí en adelante el número («León trece»). */
+  const ordinal = (n, fem) => (n <= 10 ? ORDINAL[n] + (fem ? 'a' : 'o') : enLetra(n));
+
+  const FEMENINO = new Set(('juana isabel maría catalina margarita ana leonor cristina '
+    + 'blanca urraca berenguela teresa beatriz constanza mafalda luisa carlota victoria '
+    + 'sancha elena cruzada asamblea').split(' '));
+  // tras estas palabras va el número, en letra: «capítulo tres», «siglo catorce»
+  const CUENTA = new Set(('capítulo capítulos cap c parte partes tomo tomos t volumen '
+    + 'volúmenes vol vols libro libros lib título tít sección canto acto apéndice número '
+    + 'núm n siglo siglos s fase grado clase').split(' '));
+  // y tras éstas, el ordinal: «concilio segundo de Lyón»
+  const ORDEN = new Set('concilio concilios sínodo cruzada asamblea congreso'.split(' '));
+  // con mayúscula por ir al principio de la frase, no por ser un nombre:
+  // «Véase C. Wenck» no es ningún rey
+  const NO_NOMBRE = new Set(('véase véanse ver cf según por con en de del y e o el la los '
+    + 'las lo un una al a ante tras así pero sin sobre entre desde hasta para hacia como '
+    + 'que cuando donde si no ni ya también después antes este esta estos estas').split(' '));
+
+  function romanos(t) {
+    let fin = -1, modo = '';
+    return t.replace(ROMANO, (r, i) => {
+      if (!r) return r;
+      const n = valor(r);
+      const antes = t.slice(0, i);
+      const tras = t.slice(i + r.length);
+      // la palabra de antes, con su punto si lo lleva («t.», «cap.»)
+      const m = /([\p{L}]+)(\.?)\s*$/u.exec(antes);
+      const palabra = m ? m[1] : '';
+      const baja = palabra.toLowerCase();
+      let dice = null;
+
+      // «siglos XII y XIII», «Felipe IV y V»: el segundo, como el primero
+      const enCadena = fin >= 0 && /^\s*(?:y|e|o|u|al|a|,|-|–)\s*$/.test(t.slice(fin, i));
+      if (enCadena && modo) dice = modo;
+      else if (/^[,-]\s?\d/.test(tras)) dice = 'n';               // cita: «III,240», «VI-2»
+      // «c.IV», «t.III» sí; «C. V. Langlois» no, que son iniciales
+      else if (m && CUENTA.has(baja) && (palabra.length > 1 || !/\s$/.test(antes))) dice = 'n';
+      else if (m && !m[2] && ORDEN.has(baja)) dice = FEMENINO.has(baja) ? 'oa' : 'o';
+      else if (m && !m[2] && palabra.length > 1 && /^\p{Lu}\p{Ll}/u.test(palabra)
+        && !NO_NOMBRE.has(baja) && (r.length > 1 || /^[IVX]$/.test(r))) {
+        dice = FEMENINO.has(baja) ? 'oa' : 'o';                   // «Clemente V», «Isabel II»
+      } else if (/^\s*$/.test(antes) && /^\.(\s|$)/.test(tras) && /^[IVX]+$/.test(r)) {
+        dice = 'n';                                               // «III. El proceso…»
+      } else if (r.length > 1 && /^[IVXL]+$/.test(r)) {
+        dice = 'n';                                               // suelto: el número
+      }
+      // una sola letra sin nada de lo anterior es más bien una inicial
+      // («C. V. Langlois») o una palabra: se deja
+      if (!dice) { fin = -1; modo = ''; return r; }
+      fin = i + r.length;
+      modo = dice;
+      if (dice === 'n') return enLetra(n);
+      return ordinal(n, dice === 'oa');
+    });
+  }
+
+  /** Lo que se le da a Piper para que diga `texto`, en la lengua de la voz. */
+  function paraDecir(texto, lengua) {
+    if (lengua !== 'es') return texto;
+    return romanos(texto);
   }
 
   /** El WAV de Piper con silencio al final. La cabecera es la de 44 bytes que
@@ -363,8 +473,8 @@
     const v0 = vis();
     const fria = W.cargada !== p.voz;
     h = { r: null };
-    h.p = pide({ tipo: 'di', voz: p.voz, hablante: p.hablante, texto: tz.texto,
-      vel: S.vel }).then((d) => {
+    h.p = pide({ tipo: 'di', voz: p.voz, hablante: p.hablante,
+      texto: paraDecir(tz.texto, lenguaDe(S.voz)), vel: S.vel }).then((d) => {
       W.cargada = p.voz;
       const wav = conSilencio(d.wav, pausa);
       h.r = { blob: new Blob([wav], { type: 'audio/wav' }),
@@ -659,7 +769,7 @@
   window.Voz = {
     VOCES: VOCES, LENGUAS: LENGUAS, lenguaDe: lenguaDe,
     hay: hay, baja: baja, quita: quita, prueba: prueba,
-    trocea: trocea, deParrafos: deParrafos,
+    trocea: trocea, deParrafos: deParrafos, paraDecir: paraDecir,
     lee: lee, pausa: pausa, sigue: sigue, para: para, ve: ve, cambia: cambia,
     estado: estado, on: on, ultimoInforme: ultimoInforme
   };

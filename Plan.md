@@ -26,6 +26,54 @@ sección «Rezarla en alta voz» de su `LEEME.md`.
 
 ---
 
+## ½. El libro de ahora: *Historia de la Iglesia Católica III*
+
+**Cambio de plan (16-10-2026).** Antes de seguir con PDF y OCR en general,
+el objetivo es un libro concreto: el tomo III de la *Historia de la Iglesia
+Católica* (García-Villoslada y Llorca, BAC), escaneado en un PDF de 1124
+páginas. Su capa de OCR es mala (palabras desordenadas, notas mezcladas con
+el texto), así que **Claude lee las páginas una por una** y las pasa a
+texto limpio, separando texto y notas al pie. De ahí sale un EPUB con su
+índice (parte → capítulo → sección → epígrafe) y sus notas, que se abre en
+Lector como cualquier EPUB.
+
+```
+ PDF ──▶ imagen de cada página ──▶ Claude la lee ──▶ libros/historia-iglesia-3/paginas/0028.txt …
+                                                              │
+               herramientas/paginas_a_epub.py ◀───────────────┘
+                          │
+                          ▼
+                 EPUB (índice + notas) ──▶ Lector: «Sin notas» / «Con notas»
+```
+
+- **El formato de cada página** está explicado al principio de
+  `herramientas/paginas_a_epub.py`: `@ 14` es la página impresa, `+` pega con
+  la página de antes, `#`/`##`/`###` son parte, capítulo y sección,
+  `{1. Título.}—` es un epígrafe, `[^5]` una llamada y, bajo `====`, las
+  notas `[5]` (`[+]` sigue la nota de la página anterior).
+- **Las páginas transcritas y el EPUB no van al repositorio** (`libros/` está
+  en `.gitignore`): son el libro. Va el script.
+- **En la app, cada libro lleva su ajuste de notas** (botón «Sin notas» /
+  «Con notas» en la cabecera, sólo si el libro las trae). Con notas, cada una
+  se ve y se oye **detrás del párrafo que la llama**, como «Nota 5. …»; sin
+  ellas, ni se ven ni se oyen. Se puede cambiar mientras suena: sigue desde
+  la misma frase (o desde el párrafo siguiente, si sonaba una nota).
+- Vale para cualquier EPUB: la nota se busca por el enlace de su llamada,
+  aunque esté al final del capítulo o en otro archivo.
+
+- [x] Capítulo I (págs. 13-66 impresas, 127 notas): EPUB de prueba.
+- [ ] Oírlo en el teléfono y decidir si así está bien.
+- [ ] El resto del libro, capítulo por capítulo (hasta la pág. 1090; luego
+      el índice de personas, lugares y cosas, que no se lee).
+- [x] Los numerales romanos (*Clemente V*, *Felipe IV*, *Capítulo I*) en voz
+      alta: este libro está lleno. Se adelanta de la Fase 5. `voz.js`
+      (`paraDecir`) se los cambia a Piper sin tocar lo que se ve: «Clemente
+      quinto», «Juan veintidós», «siglo catorce», «capítulo uno», las citas
+      «III,240» en número; las iniciales («C. V. Langlois») se dejan. Los
+      casos, en `pruebas.html` (§4), con ✓ o ✗.
+
+---
+
 ## 1. La forma de la app
 
 **Una PWA como Liturgicum**: HTML + JS sin paso de compilación, publicada en
@@ -94,6 +142,7 @@ servidor, «subir» quiere decir solo «abrirlo en la app».
 - Unir las palabras partidas a final de línea (`pala-` + `bra`) y las líneas
   del mismo párrafo.
 - Las **notas al pie**: callarlas, o leerlas al final del párrafo (ajuste).
+  *Hecho para EPUB (ver §½).*
 - Separar en **párrafos y oraciones**: la oración es la unidad que se dice,
   se resalta y desde la que se puede empezar.
 
@@ -121,7 +170,7 @@ acertar siempre, y es mejor un minuto de revisión que un libro mal partido.
   una se baja la primera vez que haga falta (de 20 a 80 MB) y queda para
   siempre; el motor (29 MB) es común a todas.
 - **Normalizar para la voz sin tocar el texto que se ve**: numerales romanos
-  (*Capítulo IV*, *Felipe II*), abreviaturas (*Sr.*, *pág.*, *etc.*), llamadas
+  (*Capítulo IV*, *Felipe II*; hecho, ver §½), abreviaturas (*Sr.*, *pág.*, *etc.*), llamadas
   de nota, siglas.
 - **Un diccionario de pronunciación editable** por el usuario, por libro y
   general (nombres propios, extranjerismos).

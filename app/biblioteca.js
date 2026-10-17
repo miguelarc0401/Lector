@@ -7,8 +7,9 @@
  *
  *  · libros: { id, titulo, autor, lengua, formato, archivo, portada (Blob),
  *              n (párrafos), indice: [{ t, p, hijos }], pos: { p, f },
- *              anadido, abierto }
- *  · textos: { id, t: [párrafo, …], h: { índice: nivel de título } }
+ *              notas (cuántas trae), leeNotas, anadido, abierto }
+ *  · textos: { id, t: [párrafo, …], h: { índice: nivel de título },
+ *              k: { índice: 1 si el párrafo es una nota al pie } }
  *
  * `pos` es el párrafo y la frase dentro del párrafo: no el número de trozo,
  * que depende de cómo se parta el texto y puede cambiar de una versión a

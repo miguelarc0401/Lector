@@ -536,10 +536,66 @@
     if (document.visibilityState === 'visible') { pintaCifras(); pintaInforme(); }
   });
 
+  /* --------------------------------------------------- números romanos */
+
+  /* Lo escrito y lo que la voz tiene que decir. Salen de la «Historia de la
+   * Iglesia» III, que está llena de papas, reyes, siglos y capítulos. */
+  const ROMANOS = [
+    ['Clemente V', 'Clemente quinto'],
+    ['Felipe IV el Hermoso', 'Felipe cuarto el Hermoso'],
+    ['Bonifacio VIII', 'Bonifacio octavo'],
+    ['Juan XXII', 'Juan veintidós'],
+    ['Isabel II y Juana I', 'Isabel segunda y Juana primera'],
+    ['Capítulo I. El primer papa aviñonés', 'Capítulo uno. El primer papa aviñonés'],
+    ['siglo XIV', 'siglo catorce'],
+    ['los siglos XII y XIII', 'los siglos doce y trece'],
+    ['el concilio II Lugdunense', 'el concilio segundo Lugdunense'],
+    ['III. El proceso de los Templarios', 'tres. El proceso de los Templarios'],
+    ['Rainaldi, Annales VI,564; Finke, Acta Aragonensia I,153', 'Rainaldi, Annales seis,564; Finke, Acta Aragonensia uno,153'],
+    ['Villani, Istorie fiorentine VIII c.80', 'Villani, Istorie fiorentine ocho c.80'],
+    ['t.III, c.IV', 't.tres, c.cuatro'],
+    ['por C. V. Langlois', 'por C. V. Langlois'],
+    ['L. Delisle y M. Heber', 'L. Delisle y M. Heber'],
+    ['D.ª Juana I de Navarra', 'D.ª Juana primera de Navarra'],
+    ['el MIL y el CIVIL', 'el MIL y el CIVIL'],
+    ['Inf. XIX,82-87', 'Inf. diecinueve,82-87'],
+    ['León XIII y Pío XII', 'León trece y Pío doce'],
+    ['Bernardo Délicieux y Juan de San Víctor', 'Bernardo Délicieux y Juan de San Víctor'],
+    ['Véase C. Wenck, Klemens V', 'Véase C. Wenck, Klemens quinto'],
+    ['Por V. Langlois', 'Por V. Langlois'],
+    ['Luis X y Gregorio IX', 'Luis décimo y Gregorio noveno'],
+    ['V. Clemente V y el imperio', 'cinco. Clemente quinto y el imperio'],
+    ['los III frayres', 'los tres frayres'],
+    ['p.LXII-LXVI', 'p.sesenta y dos-sesenta y seis']
+  ];
+
+  function pintaRomanos() {
+    const ul = $('#romanos');
+    ul.innerHTML = '';
+    ROMANOS.forEach(([escrito, espera]) => {
+      const dice = Voz.paraDecir(escrito, 'es');
+      const li = document.createElement('li');
+      li.className = dice === espera ? 'bien' : 'mal';
+      li.textContent = (dice === espera ? '✓ ' : '✗ ') + escrito + ' → ' + dice
+        + (dice === espera ? '' : '  (se esperaba: ' + espera + ')');
+      li.addEventListener('click', async () => {
+        if (!H.hay[base(A.voz)] || Voz.lenguaDe(A.voz) !== 'es') {
+          H.medida = 'Para oírlo, baja antes una voz en castellano.';
+          pintaVoz();
+          return;
+        }
+        try { await oye((await Voz.prueba(A.voz, escrito, +A.vel)).blob); }
+        catch (err) { H.medida = 'No se pudo decir: ' + err.message; pintaVoz(); }
+      });
+      ul.appendChild(li);
+    });
+  }
+
   /* ------------------------------------------------------- al abrir */
 
   pintaVoces();
   miraVoz();
   pintaTexto();
   pintaInforme();
+  pintaRomanos();
 })();

@@ -132,9 +132,11 @@
   /* Las notas: lo que suena mal al oírlo en medio de una frase. Las que el
    * EPUB marca como tales, y las llamadas sin marcar que son un numerito
    * con enlace —«<sup><a href="#n3">3</a></sup>»—. */
+  const TIPO_NOTA = /\b(noteref|footnotes?|endnotes?|rearnotes?|doc-noteref|doc-footnote|doc-endnotes?)\b/;
+  const tipoDe = (el) => (el.getAttribute('epub:type') || '') + ' ' + (el.getAttribute('role') || '');
+
   function esNota(el, tag) {
-    const tipo = (el.getAttribute('epub:type') || '') + ' ' + (el.getAttribute('role') || '');
-    if (/\b(noteref|footnote|endnote|rearnote|doc-noteref|doc-footnote|doc-endnote)\b/.test(tipo)) return true;
+    if (TIPO_NOTA.test(tipoDe(el))) return true;
     if (tag === 'a' && /#/.test(el.getAttribute('href') || '')) {
       const t = el.textContent.trim();
       if (/^[\[(]?[\d*†‡a-z]{1,3}[\])]?$/i.test(t)) return true;
@@ -142,21 +144,65 @@
     return false;
   }
 
+  /** El texto de la nota a la que lleva una llamada, o null. La nota no se
+   *  lee donde está —al final del capítulo, o en otro archivo—, sino justo
+   *  después del párrafo que la llama: así, al oírla, se sabe de qué habla. */
+  function textoDeNota(a, ruta, L) {
+    const href = a.getAttribute('href');
+    if (!href || !/#/.test(href) || !L.docs) return null;
+    const r = resuelve(ruta, href);
+    const doc = L.docs.get(r.ruta);
+    if (!doc || !r.frag) return null;
+    let el = doc.getElementById(r.frag);
+    if (!el) {
+      try { el = doc.querySelector('[name="' + CSS.escape(r.frag) + '"]'); } catch (_) { el = null; }
+    }
+    if (!el) return null;
+    // la nota entera: el bloque marcado como nota que la contiene, o el
+    // párrafo en que cae el ancla
+    let caja = el;
+    for (let x = el; x && x.nodeType === 1; x = x.parentNode) {
+      if (/\b(footnote|endnote|rearnote|doc-footnote|doc-endnote)\b/.test(tipoDe(x))) { caja = x; break; }
+    }
+    if (caja === el && !BLOQUE.has(el.localName.toLowerCase())) {
+      for (let x = el.parentNode; x && x.nodeType === 1; x = x.parentNode) {
+        if (BLOQUE.has(x.localName.toLowerCase())) { caja = x; break; }
+      }
+    }
+    L.usadas.add(caja);
+    const num = a.textContent.replace(/[\s\[\]()]/g, '');
+    let t = caja.textContent.replace(/\s+/g, ' ').trim();
+    // el número con que empieza la nota (o su enlace de vuelta) ya lo dice
+    // «Nota 5»
+    if (num && t.startsWith(num)) t = t.slice(num.length).replace(/^[\s.):\]]+/, '');
+    if (!tieneLetra(t)) return null;
+    const n = /\d+/.exec(num);
+    return (n ? 'Nota ' + n[0] + '. ' : 'Nota. ') + t;
+  }
+
   const tieneLetra = (t) => /[\p{L}\p{N}]/u.test(t);
 
   /** Los párrafos de un documento, añadidos a `L` (el libro que se va
    *  armando). Apunta en `L.anclas` dónde cae cada `id`, para que el índice
-   *  pueda llevar a una sección a media página. */
+   *  pueda llevar a una sección a media página. Las notas que llama un
+   *  párrafo van detrás de él, cada una en su párrafo, apuntado en `L.k`. */
   function aplana(doc, ruta, L) {
     const cuerpo = doc.body || doc.getElementsByTagName('body')[0] || doc.documentElement;
     let buf = '';
     let nivel = 0;
+    let notas = [];
     const suelta = () => {
       const t = buf.replace(/\s+/g, ' ').trim();
       buf = '';
-      if (!t || !tieneLetra(t)) return;
-      if (nivel) L.h[L.t.length] = nivel;
-      L.t.push(t);
+      if (t && tieneLetra(t)) {
+        if (nivel) L.h[L.t.length] = nivel;
+        L.t.push(t);
+      }
+      for (const n of notas) {
+        L.k[L.t.length] = 1;
+        L.t.push(n);
+      }
+      notas = [];
     };
     const ancla = (el) => {
       const id = el.getAttribute('id') || (el.localName === 'a' && el.getAttribute('name'));
@@ -169,6 +215,7 @@
         if (c.nodeType !== 1) continue;
         const tag = c.localName.toLowerCase();
         if (NADA.has(tag)) continue;
+        if (L.usadas.has(c)) continue;   // una nota que ya se leyó tras su llamada
         if (BLOQUE.has(tag)) {
           suelta();
           ancla(c);
@@ -180,7 +227,12 @@
           nivel = antes;
         } else {
           ancla(c);
-          if (esNota(c, tag)) continue;
+          if (esNota(c, tag)) {
+            const llama = tag === 'a' ? c : c.querySelector && c.querySelector('a[href]');
+            const n = llama && textoDeNota(llama, ruta, L);
+            if (n && !notas.includes(n)) notas.push(n);
+            continue;
+          }
           if (tag === 'br') buf += ' ';
           else if (tag === 'img') { /* la imagen no se lee */ }
           else recorre(c);
@@ -242,12 +294,16 @@
       .map((r) => items.get(r.getAttribute('idref')))
       .filter((it) => it && /html|xml/.test(it.tipo));
 
-    // el texto, documento por documento, en el orden de lectura
-    const L = { t: [], h: {}, anclas: new Map(), inicios: new Map() };
+    // el texto, documento por documento, en el orden de lectura; todos
+    // abiertos antes, que una nota puede estar en otro archivo
+    const L = { t: [], h: {}, k: {}, anclas: new Map(), inicios: new Map(),
+      docs: new Map(), usadas: new WeakSet() };
     for (const it of orden) {
       const x = await texto(it.ruta);
-      if (!x) continue;
-      aplana(parsea(x, /x?html\+?xml/.test(it.tipo) ? 'application/xhtml+xml' : 'text/html'), it.ruta, L);
+      if (x) L.docs.set(it.ruta, parsea(x, /x?html\+?xml/.test(it.tipo) ? 'application/xhtml+xml' : 'text/html'));
+    }
+    for (const it of orden) {
+      if (L.docs.has(it.ruta)) aplana(L.docs.get(it.ruta), it.ruta, L);
     }
     if (!L.t.length) throw new Error('El EPUB no trae texto que leer');
 
@@ -298,13 +354,15 @@
 
     return {
       titulo: meta('title') || file.name.replace(/\.[^.]+$/, ''),
-      autor: meta('creator'),
+      autor: Array.from(opf.getElementsByTagNameNS('*', 'creator'))
+        .map((el) => el.textContent.replace(/\s+/g, ' ').trim()).filter(Boolean).join(' y '),
       lengua: codigoLengua(meta('language')) || adivinaLengua(L.t.slice(0, 400).join(' ')),
       formato: 'epub',
       portada: await portada(Z, opf, items),
       indice: indice,
       t: L.t,
-      h: L.h
+      h: L.h,
+      k: L.k
     };
   }
 

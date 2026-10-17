@@ -64,8 +64,9 @@
   };
 
   function abierto(libro, texto) {
-    const O = { libro: libro, t: texto.t, h: texto.h || {}, trozos: null,
-      primero: null, rangos: new Map() };
+    const O = { libro: libro, t: texto.t, h: texto.h || {}, k: texto.k || {},
+      trozos: null, primero: null, rangos: new Map() };
+    O.hayNotas = Object.keys(O.k).length > 0;
     O.plano = aplanaIndice(libro.indice || []);
     O.tramos = tramos(libro.indice || [], O.t.length);
     return O;
@@ -117,11 +118,16 @@
 
   const tramoDe = (O, p) => Math.max(0, O.tramos.findIndex((x) => p >= x.desde && p < x.hasta));
 
+  /* Las notas al pie se leen o no, según el libro: si no, su párrafo no da
+   * ninguna frase, y la voz pasa de largo. */
+  const leeNotas = (O) => O.hayNotas && !!O.libro.leeNotas;
+  const callada = (O, p) => !!O.k[p] && !leeNotas(O);
+
   /** Las frases del libro, partidas como las dice la voz, y dónde empieza
    *  cada párrafo en esa lista. */
   function prepara(O) {
     if (O.trozos) return;
-    O.trozos = Voz.deParrafos(O.t, O.libro.lengua);
+    O.trozos = Voz.deParrafos(O.t.map((x, p) => (callada(O, p) ? '' : x)), O.libro.lengua);
     O.primero = new Int32Array(O.t.length).fill(-1);
     for (let k = O.trozos.length - 1; k >= 0; k--) O.primero[O.trozos[k].parrafo] = k;
   }
@@ -271,11 +277,13 @@
       + esc(Voz.LENGUAS[l] || l + ' (sin voz todavía)') + '</option>').join('');
     sel.value = r.lengua || 'es';
     const capitulos = r.indice.length;
-    const palabras = r.t.reduce((s, x) => s + x.split(' ').length, 0);
+    const notas = Object.keys(r.k || {}).length;
+    const palabras = r.t.reduce((s, x, i) => s + ((r.k || {})[i] ? 0 : x.split(' ').length), 0);
     $('#i-resumen').textContent = (capitulos
       ? capitulos + (capitulos === 1 ? ' entrada' : ' entradas') + ' en el índice'
       : 'Sin índice: se verá como un solo texto')
-      + ' · ' + r.t.length.toLocaleString('es') + ' párrafos · unas '
+      + ' · ' + (r.t.length - notas).toLocaleString('es') + ' párrafos'
+      + (notas ? ' y ' + notas.toLocaleString('es') + ' notas' : '') + ' · unas '
       + Math.max(1, Math.round(palabras / 9000)) + ' h de escucha';
     d.returnValue = '';
     d.showModal();
@@ -290,13 +298,15 @@
         archivo: file.name,
         portada: r.portada,
         n: r.t.length,
+        notas: Object.keys(r.k || {}).length,
+        leeNotas: false,
         indice: r.indice,
         pos: { p: 0, f: 0 },
         anadido: Date.now(),
         abierto: Date.now()
       };
       try {
-        await Biblioteca.guarda(libro, { t: r.t, h: r.h });
+        await Biblioteca.guarda(libro, { t: r.t, h: r.h, k: r.k || {} });
       } catch (err) {
         alert('No se pudo guardar el libro: ' + (err.message || err));
         return;
@@ -323,6 +333,7 @@
       + '<a class="boton icono" href="#/" aria-label="Biblioteca">←</a>'
       + '<div class="rotulos"><b>' + esc(O.libro.titulo) + '</b>'
       + '<span id="capitulo" class="nota"></span></div>'
+      + (O.hayNotas ? '<button type="button" class="boton" id="b-notas"></button>' : '')
       + '<button type="button" class="boton" id="b-indice">Índice</button></header>'
       + '<main class="lectura"><article id="texto" class="texto" lang="'
       + esc(O.libro.lengua || 'es') + '"></article></main>'
@@ -335,6 +346,10 @@
       + '</div></footer>';
 
     $('#b-indice').addEventListener('click', () => abreIndice(O));
+    if (O.hayNotas) {
+      $('#b-notas').addEventListener('click', () => cambiaNotas(O));
+      pintaNotas(O);
+    }
     $('#b-sigue').addEventListener('click', () => {
       L.sigue = true;
       $('#b-sigue').hidden = true;
@@ -367,6 +382,10 @@
       const el = document.createElement(n ? (n === 1 ? 'h2' : n === 2 ? 'h3' : 'h4') : 'p');
       el.dataset.i = p;
       el.textContent = O.t[p];
+      if (O.k[p]) {
+        el.className = 'nota-pie';
+        el.hidden = callada(O, p);
+      }
       f.appendChild(el);
     }
     if (i < O.tramos.length - 1) f.appendChild(botonTramo(O, i + 1, '', ' →'));
@@ -446,6 +465,56 @@
     d.showModal();
     const act = $('.actual', lista);
     if (act) act.scrollIntoView({ block: 'center' });
+  }
+
+  /* ------------------------------------------------------------ las notas */
+
+  function pintaNotas(O) {
+    const b = $('#b-notas');
+    if (!b) return;
+    const si = leeNotas(O);
+    b.textContent = si ? 'Con notas' : 'Sin notas';
+    b.setAttribute('aria-pressed', si ? 'true' : 'false');
+    b.title = si ? 'Lee las notas al pie, detrás de su párrafo. Toca para leer sólo el texto.'
+      : 'Lee sólo el texto. Toca para leer también las notas al pie.';
+  }
+
+  /** Leer las notas o sólo el texto. Si está sonando, sigue sonando desde la
+   *  misma frase; si sonaba una nota y ahora se callan, desde el párrafo
+   *  siguiente. */
+  function cambiaNotas(O) {
+    const est = Voz.estado().estado;
+    const suena = L.sonando === O && est !== 'parada';
+    let pos = O.libro.pos || { p: 0, f: 0 };
+    if (suena) {
+      const k = Voz.estado().i;
+      const p = O.trozos[k].parrafo;
+      pos = { p: p, f: k - O.primero[p] };
+    }
+    const visto = primerVisible();
+    O.libro.leeNotas = !leeNotas(O);
+    Biblioteca.cambia(O.libro.id, { leeNotas: O.libro.leeNotas }).catch(() => {});
+    if (callada(O, pos.p)) pos = { p: pos.p, f: 0 };
+    O.trozos = null;
+    O.rangos = new Map();
+    prepara(O);
+    const k = trozoDe(O, pos);
+    pintaNotas(O);
+    pintaTramo(O, L.tramo);
+    if (suena && est === 'diciendo') {
+      Voz.lee(O.trozos, k, { voz: Voz.estado().voz, vel: +A.vel || 1, titulo: O.libro.titulo });
+    } else if (suena) {
+      Voz.para();
+      const p = O.trozos[k].parrafo;
+      O.libro.pos = { p: p, f: k - O.primero[p] };
+      Biblioteca.cambia(O.libro.id, { pos: O.libro.pos }).catch(() => {});
+    }
+    // la vista se queda donde estaba (o en lo que sigue, si era una nota)
+    let v = visto ?? pos.p;
+    while (v < O.t.length - 1 && callada(O, v)) v++;
+    if (L.sigue && suena) sigueALaVoz(false);
+    else irA(v, false);
+    aviso(leeNotas(O) ? 'Ahora lee también las notas, detrás de su párrafo.' : 'Ahora lee sólo el texto.');
   }
 
   /* -------------------------------------------------------------- la voz */
@@ -663,7 +732,7 @@
     const art = $('#texto');
     if (!art) return null;
     const arriba = ($('.cabeza') || { offsetHeight: 0 }).offsetHeight;
-    for (const el of art.querySelectorAll('[data-i]')) {
+    for (const el of art.querySelectorAll('[data-i]:not([hidden])')) {
       if (el.getBoundingClientRect().bottom > arriba + 4) return +el.dataset.i;
     }
     return null;
