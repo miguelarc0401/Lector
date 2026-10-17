@@ -338,7 +338,7 @@ Por eso el motor de la voz va aparte desde el principio (`voz.js` habla con
 
 ## 6. La misma biblioteca en el PC y en el teléfono (Google Drive)
 
-**Aprobado (17-10-2026) y hecho; falta el ID de cliente de Google.** Abrir un libro en
+**Aprobado (17-10-2026) y hecho; falta probarlo con Google en el PC y en el teléfono.** Abrir un libro en
 el PC y que salga también en el teléfono, con su posición. Es **opcional**:
 sin conectar Google, la app sigue igual que ahora, y conectada sigue
 funcionando sin red; lo de Drive se pone al día cuando la hay.
@@ -474,7 +474,7 @@ EPUB de la *Historia de la Iglesia III* abierto en el PC tiene que salir en
 el teléfono.
 
 - [x] Diseño aprobado.
-- [ ] Proyecto en Google Cloud y el ID de cliente (va en `CLIENTE`, al
+- [x] Proyecto en Google Cloud y el ID de cliente (en `CLIENTE`, al
       principio de `app/nube.js`).
 - [x] `nube.js`, `oauth.html` y los cambios; probado con el Drive de mentira.
 

@@ -29,7 +29,7 @@
   'use strict';
 
   /* El ID de cliente de Google Cloud (Plan.md §6). Es público. */
-  const CLIENTE = '';
+  const CLIENTE = '709518652366-rfi64nslkp5506se3lb5msmv3rri1o85.apps.googleusercontent.com';
 
   const LOCAL = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
   const FALSO = LOCAL && !leeLS('lector-drive-real');
