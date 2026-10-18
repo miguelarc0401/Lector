@@ -32,6 +32,33 @@
     catch (_) { return {}; }
   })());
 
+  // las velocidades que se pueden elegir, en la cinta y en Ajustes
+  const VELS = [0.6, 0.7, 0.8, 0.9, 1, 1.1, 1.2, 1.3, 1.4, 1.5, 1.75, 2];
+  const velTexto = (v) => String(v).replace('.', ',') + '×';
+
+  /** Un paso más despacio (-1) o más deprisa (+1), desde la de ahora. */
+  function ponVelocidad(paso) {
+    const ahora = +A.vel || 1;
+    let i = VELS.findIndex((v) => v >= ahora - 1e-9);
+    if (i < 0) i = VELS.length - 1;
+    // si la guardada no es de la lista, el primer paso lleva a la vecina
+    else if (paso < 0 || VELS[i] === ahora) i += paso;
+    i = Math.max(0, Math.min(VELS.length - 1, i));
+    if (VELS[i] === ahora) return;
+    A.vel = VELS[i];
+    guardaAjustes();
+    pintaVelocidad();
+    if (Voz.estado().estado !== 'parada') Voz.cambia({ vel: A.vel });
+  }
+
+  function pintaVelocidad() {
+    const v = +A.vel || 1;
+    const t = $('#vel');
+    if (t) t.textContent = velTexto(v);
+    if ($('#b-lento')) $('#b-lento').disabled = v <= VELS[0];
+    if ($('#b-rapido')) $('#b-rapido').disabled = v >= VELS[VELS.length - 1];
+  }
+
   function guardaAjustes() {
     try { localStorage.setItem(CLAVE, JSON.stringify(A)); } catch (_) { /* */ }
   }
@@ -343,6 +370,10 @@
       + '<button type="button" id="b-atras" aria-label="Frase anterior">⏮</button>'
       + '<button type="button" id="b-dice" class="principal grande" aria-label="Leer">▶</button>'
       + '<button type="button" id="b-adelante" aria-label="Frase siguiente">⏭</button>'
+      + '</div><div class="fila velocidad">'
+      + '<button type="button" id="b-lento" aria-label="Más despacio">−</button>'
+      + '<span id="vel" aria-live="polite"></span>'
+      + '<button type="button" id="b-rapido" aria-label="Más deprisa">+</button>'
       + '</div></footer>';
 
     $('#b-indice').addEventListener('click', () => abreIndice(O));
@@ -358,6 +389,9 @@
     $('#b-dice').addEventListener('click', () => dice(O));
     $('#b-atras').addEventListener('click', () => salta(O, -1));
     $('#b-adelante').addEventListener('click', () => salta(O, +1));
+    $('#b-lento').addEventListener('click', () => ponVelocidad(-1));
+    $('#b-rapido').addEventListener('click', () => ponVelocidad(+1));
+    pintaVelocidad();
     $('#texto').addEventListener('click', (ev) => toca(O, ev));
 
     const suenaEste = L.sonando === O && Voz.estado().estado !== 'parada';
@@ -770,9 +804,10 @@
       + '<a class="boton" href="#/">← Biblioteca</a></header>'
       + '<section class="tarjeta"><h2>Velocidad</h2>'
       + '<select id="a-vel">'
-      + [['0.8', 'Más despacio'], ['0.9', 'Un poco más despacio'], ['1', 'Normal'],
-        ['1.1', 'Un poco más deprisa'], ['1.25', 'Más deprisa'], ['1.5', 'Mucho más deprisa']]
-        .map(([v, r]) => '<option value="' + v + '">' + r + '</option>').join('')
+      + VELS.concat(VELS.includes(+A.vel || 1) ? [] : [+A.vel])
+        .sort((a, b) => a - b)
+        .map((v) => '<option value="' + v + '">' + velTexto(v)
+          + (v === 1 ? ' (normal)' : '') + '</option>').join('')
       + '</select></section>'
       + '<section class="tarjeta"><h2>Voces</h2>'
       + '<p class="nota">Una por lengua: la del libro decide cuál suena. El motor '

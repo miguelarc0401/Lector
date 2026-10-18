@@ -410,6 +410,17 @@ button.tramo {
   font-size: 1.2rem;
 }
 
+.mandos .velocidad { gap: .8rem; margin-top: .2rem; }
+.mandos .velocidad button {
+  min-width: 44px;
+  min-height: 40px;
+  font-size: 1.3rem;
+}
+.mandos #vel {
+  min-width: 3.5em;
+  font-variant-numeric: tabular-nums;
+}
+
 .mandos button.grande {
   min-width: 64px;
   min-height: 64px;
@@ -420,7 +431,7 @@ button.flota {
   position: fixed;
   left: 50%;
   transform: translateX(-50%);
-  bottom: 7.5rem;
+  bottom: 10rem;
   z-index: 3;
   box-shadow: var(--sombra);
 }
