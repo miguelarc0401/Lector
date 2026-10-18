@@ -3,7 +3,8 @@
  * Tres vistas, por la dirección:
  *  · #/            la biblioteca, y abrir un libro nuevo
  *  · #/libro/<id>  el libro: su texto por tramos, su índice y la voz
- *  · #/ajustes     las voces de cada lengua y la velocidad
+ *  · #/ajustes     las voces de cada lengua, la velocidad y la
+ *                  sincronización con Google Drive (nube.js)
  *
  * La voz (voz.js) lee el libro entero, frase por frase, desde la que se
  * toque; aquí se le da la lista de frases y se escucha qué frase suena para
@@ -256,13 +257,15 @@
       + '<div class="botones"><label class="boton principal">Abrir un libro'
       + '<input type="file" id="archivo" hidden accept=".epub,.txt,.md,application/epub+zip,text/plain,text/markdown">'
       + '</label></div>'
-      + '<p class="nota" id="importa-estado">EPUB o TXT. El libro no sale de este teléfono.</p>'
+      + '<p class="nota" id="importa-estado">' + esc(textoImporta()) + '</p>'
+      + '<div id="nube" class="nube" hidden></div>'
       + (fichas.length ? '<ul class="fichas">' + fichas.join('') + '</ul>'
         : '<section class="tarjeta"><h2>Todavía no hay libros</h2><p>Abre un '
           + 'EPUB o un TXT: se guarda aquí, con su índice, y se puede escuchar '
           + 'sin conexión desde cualquier párrafo.</p></section>')
       + '</main>';
 
+    pintaNube();
     $('#archivo').addEventListener('change', (ev) => {
       const f = ev.target.files && ev.target.files[0];
       ev.target.value = '';
@@ -270,11 +273,60 @@
     });
     vista.querySelectorAll('.quita').forEach((b) => b.addEventListener('click', async () => {
       const l = libros.find((x) => x.id === b.dataset.id);
-      if (!l || !confirm('¿Quitar «' + l.titulo + '» de la biblioteca?')) return;
+      if (!l) return;
+      const como = await preguntaQuitar(l);
+      if (!como) return;
       if (L.sonando && L.sonando.libro.id === l.id) { Voz.para(); L.sonando = null; }
-      await Biblioteca.quita(l.id);
+      await Nube.quita(l, como === 'todos');
       pinta();
     }));
+  }
+
+  const textoImporta = () => (Nube.estado().conectada
+    ? 'EPUB o TXT. Se guarda aquí y en tu Google Drive, para tus otros aparatos.'
+    : 'EPUB o TXT. El libro no sale de este teléfono.');
+
+  /** Quitar un libro: si está en Drive, de aquí sólo o de todos los
+   *  aparatos. Devuelve 'aqui', 'todos' o nada. */
+  function preguntaQuitar(l) {
+    if (!Nube.estado().conectada || !l.nube) {
+      return Promise.resolve(confirm('¿Quitar «' + l.titulo + '» de la biblioteca?') ? 'aqui' : '');
+    }
+    const d = $('#d-quita');
+    $('#dq-titulo').textContent = '¿Quitar «' + l.titulo + '»?';
+    d.returnValue = '';
+    d.showModal();
+    return new Promise((res) => {
+      d.onclose = () => res(d.returnValue === 'aqui' || d.returnValue === 'todos' ? d.returnValue : '');
+    });
+  }
+
+  /** La línea de la nube en la biblioteca: cuándo se puso al día, o el
+   *  botón para hacerlo cuando el permiso de Google ha caducado. */
+  function pintaNube() {
+    const el = $('#nube');
+    if (!el) return;
+    const e = Nube.estado();
+    el.hidden = !e.conectada;
+    if (!e.conectada) return;
+    let t;
+    if (e.aviso) t = e.aviso;
+    else if (e.trabajando) t = 'Poniéndose al día con Drive…';
+    else if (e.error) t = e.error;
+    else if (!e.permiso) t = 'Para traer lo de tus otros aparatos, toca Sincronizar.';
+    else t = e.ultima ? 'Al día con Drive ' + haceCuanto(e.ultima) + '.' : 'Conectado a Drive.';
+    el.innerHTML = '<span class="' + (e.error ? 'mal' : 'nota') + '">' + esc(t) + '</span>'
+      + '<button type="button" id="b-nube"' + (e.trabajando ? ' disabled' : '') + '>☁ Sincronizar</button>';
+    $('#b-nube').addEventListener('click', () => Nube.ahora());
+  }
+
+  function haceCuanto(t) {
+    const m = Math.round((Date.now() - t) / 60000);
+    if (m < 1) return 'ahora mismo';
+    if (m < 60) return 'hace ' + m + ' min';
+    const h = Math.round(m / 60);
+    if (h < 24) return 'hace ' + h + ' h';
+    return 'el ' + new Date(t).toLocaleDateString('es');
   }
 
   /* ------------------------------------------------------------ importar */
@@ -292,7 +344,26 @@
       est.textContent = 'No se pudo abrir «' + file.name + '»: ' + (err.message || err);
       return;
     }
-    est.textContent = 'EPUB o TXT. El libro no sale de este teléfono.';
+    est.textContent = textoImporta();
+
+    // el mismo archivo otra vez: se abre el que ya está; y si es un libro
+    // abierto antes de que se guardaran los archivos (mismo nombre, mismos
+    // párrafos), se le guarda el archivo, y conserva su posición
+    let huella = '';
+    try { huella = await Biblioteca.huella(file); } catch (_) { /* sin crypto.subtle */ }
+    const ya = await Biblioteca.libros();
+    const igual = huella && ya.find((l) => l.huella === huella);
+    if (igual) {
+      location.hash = '#/libro/' + encodeURIComponent(igual.id);
+      return;
+    }
+    const viejo = ya.find((l) => !l.huella && l.archivo === file.name && l.n === r.t.length);
+    if (viejo) {
+      await Biblioteca.ponArchivo(viejo.id, file, file.name, huella);
+      Nube.sincroniza();
+      location.hash = '#/libro/' + encodeURIComponent(viejo.id);
+      return;
+    }
 
     const d = $('#d-importa');
     $('#i-titulo').value = r.titulo;
@@ -316,28 +387,20 @@
     d.showModal();
     d.onclose = async () => {
       if (d.returnValue !== 'guarda') return;
-      const libro = {
-        id: (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random()),
+      const libro = Biblioteca.nuevo(r, {
         titulo: $('#i-titulo').value.trim() || r.titulo,
         autor: $('#i-autor').value.trim(),
         lengua: sel.value,
-        formato: r.formato,
         archivo: file.name,
-        portada: r.portada,
-        n: r.t.length,
-        notas: Object.keys(r.k || {}).length,
-        leeNotas: false,
-        indice: r.indice,
-        pos: { p: 0, f: 0 },
-        anadido: Date.now(),
-        abierto: Date.now()
-      };
+        huella: huella
+      });
       try {
-        await Biblioteca.guarda(libro, { t: r.t, h: r.h, k: r.k || {} });
+        await Biblioteca.guarda(libro, { t: r.t, h: r.h, k: r.k || {} }, file);
       } catch (err) {
         alert('No se pudo guardar el libro: ' + (err.message || err));
         return;
       }
+      Nube.sincroniza();
       location.hash = '#/libro/' + encodeURIComponent(libro.id);
     };
   }
@@ -822,6 +885,7 @@
         + '<div class="botones"><button type="button" class="baja" hidden>Bajar</button>'
         + '<button type="button" class="quita-voz" hidden>Quitarla</button></div></div>').join('')
       + '</section>'
+      + '<section class="tarjeta" id="a-nube"></section>'
       + '<section class="tarjeta"><h2>Espacio</h2><p class="nota" id="a-espacio">…</p></section>'
       + '<p class="nota"><a href="pruebas.html">Pruebas de voz (Fase 0)</a></p>'
       + '</main>';
@@ -894,7 +958,56 @@
       });
       pintaUna();
     });
+    pintaAjustesNube();
     espacio();
+  }
+
+  /** La tarjeta de Google Drive en Ajustes. */
+  async function pintaAjustesNube() {
+    const el = $('#a-nube');
+    if (!el) return;
+    const e = Nube.estado();
+    let h = '<h2>Sincronizar con Google Drive</h2>'
+      + '<p class="nota">Los libros que abras aquí salen también en tus otros aparatos, '
+      + 'con la frase por la que vas. Se guardan en una carpeta oculta de tu Drive que '
+      + 'sólo ve Lector. Sin conexión todo sigue igual: se pone al día después. '
+      + '<a href="privacidad.html">Privacidad</a>.</p>';
+    if (!e.disponible) {
+      h += '<p class="nota">Todavía no se puede: falta el ID de cliente de Google (Plan.md §6).</p>';
+    } else if (!e.conectada) {
+      h += (e.error ? '<p class="mal">' + esc(e.error) + '</p>' : '')
+        + '<div class="botones"><button type="button" class="principal" id="a-conecta"'
+        + (e.aviso ? ' disabled' : '') + '>' + (e.aviso ? esc(e.aviso) : 'Conectar con Google')
+        + '</button></div>';
+    } else {
+      const solo = [];
+      for (const l of await Biblioteca.libros()) {
+        if (!l.huella && !(await Biblioteca.archivo(l.id))) solo.push(l.titulo);
+      }
+      h += '<p>' + (e.aviso ? esc(e.aviso) : e.trabajando ? 'Poniéndose al día…'
+        : e.error ? '<span class="mal">' + esc(e.error) + '</span>'
+          : e.ultima ? 'Al día ' + haceCuanto(e.ultima) + '.' : 'Conectado.') + '</p>'
+        + (e.permiso ? '' : '<p class="nota">El permiso de Google dura una hora; al tocar '
+          + 'Sincronizar se renueva, sin preguntar nada.</p>')
+        + (solo.length ? '<p class="nota">Sólo en este aparato, porque se abrieron antes de '
+          + 'sincronizar: ' + solo.map((t) => '«' + esc(t) + '»').join(', ')
+          + '. Vuelve a abrir su archivo y se subirán, sin perder por dónde vas.</p>' : '')
+        + '<div class="botones"><button type="button" class="principal" id="a-sincroniza"'
+        + (e.trabajando ? ' disabled' : '') + '>☁ Sincronizar ahora</button>'
+        + '<button type="button" id="a-desconecta">Desconectar</button></div>'
+        + '<p class="nota">Desconectar olvida la sesión en este aparato; los libros se quedan. '
+        + 'Para borrar lo guardado en Drive: Drive → Configuración → Administrar aplicaciones '
+        + '→ Lector → Eliminar datos ocultos.</p>';
+    }
+    if (e.falso) h += '<p class="nota">(En la computadora: Drive de mentira, herramientas/drive_falso.py.)</p>';
+    if (!$('#a-nube')) return;
+    el.innerHTML = h;
+    const b = $('#a-conecta') || $('#a-sincroniza');
+    if (b) b.addEventListener('click', () => Nube.ahora());
+    const d = $('#a-desconecta');
+    if (d) d.addEventListener('click', () => {
+      if (confirm('¿Desconectar de Google Drive en este aparato? Los libros se quedan aquí.')) Nube.desconecta();
+    });
   }
 
   async function espacio() {
@@ -916,5 +1029,25 @@
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch((e) => console.warn('sin service worker:', e));
   }
+  /* La nube: lo que cambia en Drive se pinta; lo que suena no se toca. */
+  Nube.on('estado', () => {
+    const r = ruta();
+    if (r.vista === 'biblioteca') pintaNube();
+    else if (r.vista === 'ajustes') pintaAjustesNube();
+  });
+  Nube.on('cambio', async (ids) => {
+    const r = ruta();
+    if (r.vista === 'biblioteca') {
+      if (!document.querySelector('dialog[open]')) pintaBiblioteca();
+    } else if (r.vista === 'libro' && L.vista && ids.includes(L.vista.libro.id)
+      && L.sonando !== L.vista) {
+      // la posición que llega de otro aparato: para la próxima vez que se toque ▶
+      const l = await Biblioteca.libro(L.vista.libro.id);
+      if (l && L.vista) Object.assign(L.vista.libro, { pos: l.pos, leeNotas: l.leeNotas, cambiado: l.cambiado });
+    }
+  });
+  Nube.inicia({ ocupado: (id) => !!L.sonando && L.sonando.libro.id === id
+    && Voz.estado().estado !== 'parada' });
+
   pinta();
 })();

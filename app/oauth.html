@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>Lector · Google</title>
+  <link rel="stylesheet" href="estilos.css">
+</head>
+<body>
+<main><h1>Lector</h1><p id="m" class="nota">Entrando…</p></main>
+<script>
+/* Aquí vuelve Google con el permiso para Drive (nube.js). Lo deja en
+ * localStorage, se lo dice a la app por un BroadcastChannel y se cierra; o,
+ * si se entró en la misma página, vuelve a la app. El permiso viene en el
+ * fragmento (#access_token=…), que no llega a ningún servidor. */
+(function () {
+  'use strict';
+  const m = document.getElementById('m');
+  const q = new URLSearchParams(location.hash.slice(1) || location.search.slice(1));
+  history.replaceState(null, '', location.pathname);   // que el permiso no quede en el historial
+  let ida = null;
+  try { ida = JSON.parse(localStorage.getItem('lector-nube-ida') || 'null'); } catch (_) { /* */ }
+  try { localStorage.removeItem('lector-nube-ida'); } catch (_) { /* */ }
+
+  let r;
+  if (!ida || q.get('state') !== ida.estado) {
+    r = { error: 'La respuesta de Google no es la que se pidió.' };
+  } else if (q.get('access_token')) {
+    const s = +q.get('expires_in') || 3600;
+    const p = { token: q.get('access_token'), caduca: Date.now() + (s - 60) * 1000 };
+    try { localStorage.setItem('lector-nube-permiso', JSON.stringify(p)); } catch (_) { /* */ }
+    r = { token: p.token };
+  } else {
+    r = { error: q.get('error') || 'Google no dio permiso.' };
+  }
+  try { new BroadcastChannel('lector-nube').postMessage(r); } catch (_) { /* */ }
+
+  const app = './' + ((ida && ida.vuelta) || '#/');
+  if (ida && ida.modo === 'pagina') {
+    location.replace(app);
+    return;
+  }
+  m.textContent = r.token ? 'Listo. Vuelve a Lector.' : 'No se pudo entrar: ' + r.error;
+  m.insertAdjacentHTML('afterend', '<p><a class="boton" href="' + app + '">Ir a Lector</a></p>');
+  setTimeout(() => window.close(), r.token ? 300 : 4000);
+})();
+</script>
+</body>
+</html>
