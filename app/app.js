@@ -33,8 +33,9 @@
     catch (_) { return {}; }
   })());
 
-  // las velocidades que se pueden elegir, en la cinta y en Ajustes
-  const VELS = [0.6, 0.7, 0.8, 0.9, 1, 1.1, 1.2, 1.3, 1.4, 1.5, 1.75, 2];
+  // las velocidades que se pueden elegir, en la cinta y en Ajustes:
+  // de 0,1 en 0,1, de 0,6 a 2
+  const VELS = Array.from({ length: 15 }, (_, i) => (6 + i) / 10);
   const velTexto = (v) => String(v).replace('.', ',') + '×';
 
   /** Un paso más despacio (-1) o más deprisa (+1), desde la de ahora. */
