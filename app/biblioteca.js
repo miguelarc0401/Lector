@@ -8,7 +8,9 @@
  * diez libros completos en memoria.
  *
  *  · libros: { id, titulo, autor, lengua, formato, archivo, portada (Blob),
- *              n (párrafos), indice: [{ t, p, hijos }], pos: { p, f },
+ *              n (párrafos), indice: [{ t, p, hijos }], pos: { p, f, c },
+ *              paginas: [[párrafo, letra, nombre?], …] (dónde empieza
+ *              cada página; ver importar.js),
  *              notas (cuántas trae), leeNotas, anadido, abierto,
  *              huella (SHA-256 del archivo), cambiado (hora del último
  *              cambio de `pos` o `leeNotas`), nube (ya está en Drive) }
@@ -18,7 +20,8 @@
  *
  * `pos` es el párrafo y la frase dentro del párrafo: no el número de trozo,
  * que depende de cómo se parta el texto y puede cambiar de una versión a
- * otra de la app.
+ * otra de la app. `c`, la letra del párrafo en que empieza esa frase, es
+ * sólo para saber en qué página se va; no viaja a Drive.
  *
  * Los libros abiertos antes de la versión 2 no tienen archivo ni huella:
  * se quedan sólo en su aparato hasta que se vuelve a abrir su archivo.
@@ -99,6 +102,7 @@
       notas: Object.keys(r.k || {}).length,
       leeNotas: false,
       indice: r.indice,
+      paginas: r.paginas || null,
       pos: { p: 0, f: 0 },
       anadido: ahora,
       abierto: ahora,

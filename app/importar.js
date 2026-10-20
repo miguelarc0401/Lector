@@ -4,7 +4,12 @@
  * `Importa.archivo(file)` es lo que guarda la biblioteca (biblioteca.js):
  *
  *   { titulo, autor, lengua, formato, portada, indice, t: [párrafo, …],
- *     h: { índice del párrafo: nivel de título } }
+ *     h: { índice del párrafo: nivel de título }, paginas }
+ *
+ * `paginas` dice dónde empieza cada página: [[párrafo, letra, nombre?], …].
+ * Si el EPUB marca las páginas del libro impreso (epub:type="pagebreak"),
+ * son ésas, con su número; si no, se parte el texto en páginas de
+ * PAGINA letras, como las de un libro corriente.
  *
  * Cada párrafo es texto ya limpio —un solo espacio entre palabras, sin
  * saltos de renglón—, que es lo que la voz parte en frases (voz.js) y lo que
@@ -216,6 +221,14 @@
         const tag = c.localName.toLowerCase();
         if (NADA.has(tag)) continue;
         if (L.usadas.has(c)) continue;   // una nota que ya se leyó tras su llamada
+        if (/\bpagebreak\b/.test(tipoDe(c))) {
+          // dónde empieza una página del libro impreso; su número no se lee
+          ancla(c);
+          const n = (c.getAttribute('title') || c.getAttribute('aria-label')
+            || c.textContent).replace(/\s+/g, ' ').trim();
+          L.pags.push([L.t.length, buf.replace(/\s+/g, ' ').trimStart().length, n]);
+          continue;
+        }
         if (BLOQUE.has(tag)) {
           suelta();
           ancla(c);
@@ -297,7 +310,7 @@
     // el texto, documento por documento, en el orden de lectura; todos
     // abiertos antes, que una nota puede estar en otro archivo
     const L = { t: [], h: {}, k: {}, anclas: new Map(), inicios: new Map(),
-      docs: new Map(), usadas: new WeakSet() };
+      docs: new Map(), usadas: new WeakSet(), pags: [] };
     for (const it of orden) {
       const x = await texto(it.ruta);
       if (x) L.docs.set(it.ruta, parsea(x, /x?html\+?xml/.test(it.tipo) ? 'application/xhtml+xml' : 'text/html'));
@@ -362,7 +375,9 @@
       indice: indice,
       t: L.t,
       h: L.h,
-      k: L.k
+      k: L.k,
+      paginas: L.pags.length > 1
+        ? L.pags.sort((a, b) => a[0] - b[0] || a[1] - b[1]) : null
     };
   }
 
@@ -532,9 +547,37 @@
     };
   }
 
+  /* ----------------------------------------------------------- páginas */
+
+  /* Las letras de una página de libro corriente (unas 300 palabras). */
+  const PAGINA = 1800;
+
+  /** Las páginas de un libro que no trae las suyas: cada PAGINA letras,
+   *  contando las notas, que en el libro impreso también ocupan sitio. */
+  function paginas(t) {
+    const r = [[0, 0]];
+    let falta = PAGINA;
+    for (let p = 0; p < t.length; p++) {
+      let c = 0;
+      while (t[p].length - c > falta) {
+        c += falta;
+        falta = PAGINA;
+        r.push([p, c]);
+      }
+      falta -= t[p].length - c;
+    }
+    return r;
+  }
+
   /* ------------------------------------------------------------ fuera */
 
   async function archivo(file) {
+    const r = await abre(file);
+    if (!r.paginas) r.paginas = paginas(r.t);
+    return r;
+  }
+
+  async function abre(file) {
     const n = file.name.toLowerCase();
     if (n.endsWith('.epub') || file.type === 'application/epub+zip') return epub(file);
     if (/\.(txt|md|markdown|text)$/.test(n) || /^text\//.test(file.type)) return txt(file);
@@ -547,5 +590,5 @@
     return txt(file);
   }
 
-  window.Importa = { archivo: archivo, adivinaLengua: adivinaLengua, arbol: arbol };
+  window.Importa = { archivo: archivo, paginas: paginas, adivinaLengua: adivinaLengua, arbol: arbol };
 })();

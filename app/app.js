@@ -120,6 +120,38 @@
     return r;
   }
 
+  /** La página en que cae la letra `c` del párrafo `p`, como «p. 50/750»
+   *  (la última es el total); nada si el libro no tiene páginas. */
+  function pagina(pg, p, c) {
+    if (!pg || !pg.length) return '';
+    let i = 0;
+    let lo = 0;
+    let hi = pg.length - 1;
+    while (lo <= hi) {
+      const m = (lo + hi) >> 1;
+      if (pg[m][0] < p || (pg[m][0] === p && pg[m][1] <= c)) { i = m; lo = m + 1; } else hi = m - 1;
+    }
+    const nombre = (j) => pg[j][2] || String(j + 1);
+    return 'p. ' + nombre(i) + '/' + nombre(pg.length - 1);
+  }
+
+  /** Las páginas de un libro guardado antes de que las hubiera: las del
+   *  EPUB, si se tiene el archivo y sale partido igual; si no, contadas. */
+  async function ponPaginas(l, t) {
+    let pg = null;
+    try {
+      const a = l.formato === 'epub' && await Biblioteca.archivo(l.id);
+      if (a) {
+        const r = await Importa.archivo(new File([a.blob], a.nombre || 'libro.epub',
+          { type: 'application/epub+zip' }));
+        if (r.t.length === l.n) pg = r.paginas;
+      }
+    } catch (_) { /* se cuentan */ }
+    if (!pg) pg = Importa.paginas(t || (await Biblioteca.texto(l.id)).t);
+    l.paginas = pg;
+    await Biblioteca.cambia(l.id, { paginas: pg });
+  }
+
   function tramos(indice, n) {
     const cortes = new Set([0]);
     const parte = (lista, fin) => lista.forEach((e, i) => {
@@ -169,6 +201,14 @@
     let k = O.primero[p] + ((pos && pos.f) || 0);
     while (k > O.primero[p] && (k >= O.trozos.length || O.trozos[k].parrafo !== p)) k--;
     return k;
+  }
+
+  /** La posición que se guarda de la frase `k`: su párrafo, cuál es en él
+   *  y en qué letra empieza (para la página). */
+  function posDe(O, k) {
+    const p = O.trozos[k].parrafo;
+    const r = rangos(O, p)[k - O.primero[p]];
+    return { p: p, f: k - O.primero[p], c: r ? r[0] : 0 };
   }
 
   /** Dónde cae cada frase de un párrafo dentro de su texto: [ini, fin]. */
@@ -238,6 +278,7 @@
       }
       const pos = (l.pos && l.pos.p) || 0;
       const pct = l.n ? Math.round((100 * pos) / l.n) : 0;
+      const pag = pagina(l.paginas, pos, (l.pos && l.pos.c) || 0);
       const e = entradaDe({ plano: aplanaIndice(l.indice || []) }, pos);
       return '<li class="ficha">'
         + '<a class="libro" href="#/libro/' + encodeURIComponent(l.id) + '">'
@@ -246,7 +287,7 @@
         + (l.autor ? '<span class="nota">' + esc(l.autor) + '</span>' : '')
         + '<div class="barra"><div style="width:' + pct + '%"></div></div>'
         + '<span class="nota">' + (suena === l.id ? '<span class="vivo">' + (est === 'pausada' ? 'En pausa' : 'Sonando') + '</span> · ' : '')
-        + pct + ' %' + (e ? ' · ' + esc(e.t) : '') + '</span></div></a>'
+        + pct + ' %' + (pag ? ' · ' + esc(pag) : '') + (e ? ' · ' + esc(e.t) : '') + '</span></div></a>'
         + '<button type="button" class="quita" data-id="' + esc(l.id) + '" aria-label="Quitar «'
         + esc(l.titulo) + '»">×</button></li>';
     });
@@ -266,6 +307,7 @@
       + '</main>';
 
     pintaNube();
+    sinPaginas(libros);
     $('#archivo').addEventListener('change', (ev) => {
       const f = ev.target.files && ev.target.files[0];
       ev.target.value = '';
@@ -280,6 +322,19 @@
       await Nube.quita(l, como === 'todos');
       pinta();
     }));
+  }
+
+  /** Los libros guardados antes de que hubiera páginas las sacan una vez,
+   *  uno tras otro, y la biblioteca se vuelve a pintar con ellas. */
+  const _paginados = new Set();
+  async function sinPaginas(libros) {
+    const faltan = libros.filter((l) => !l.paginas && !_paginados.has(l.id));
+    if (!faltan.length) return;
+    faltan.forEach((l) => _paginados.add(l.id));
+    for (const l of faltan) {
+      try { await ponPaginas(l); } catch (err) { console.error(err); }
+    }
+    if (ruta().vista === 'biblioteca') pinta();
   }
 
   const textoImporta = () => (Nube.estado().conectada
@@ -418,6 +473,11 @@
     }
     Biblioteca.cambia(id, { abierto: Date.now() });
     L.vista = O;
+    if (!O.libro.paginas) {
+      ponPaginas(O.libro, O.t).then(() => {
+        if (L.vista === O) pintaCapitulo(O, primerVisible() ?? ((O.libro.pos || {}).p || 0));
+      }).catch(() => {});
+    }
 
     vista.innerHTML = '<header class="cabeza">'
       + '<a class="boton icono" href="#/" aria-label="Biblioteca">←</a>'
@@ -463,7 +523,10 @@
     pintaTramo(O, tramoDe(O, p));
     pintaEstado();
     if (suenaEste) sigueALaVoz(false);
-    else irA(p, false);
+    else {
+      irA(p, false);
+      pintaCapitulo(O, p, (O.libro.pos || {}).c);
+    }
     miraLaVoz(O);
   }
 
@@ -509,11 +572,13 @@
     return b;
   }
 
-  function pintaCapitulo(O, p) {
-    const c = $('#capitulo');
-    if (!c) return;
+  /** En la cabecera, la página y el capítulo de la letra `c` del párrafo
+   *  `p` (lo que suena o lo que se ve). */
+  function pintaCapitulo(O, p, c) {
+    const el = $('#capitulo');
+    if (!el) return;
     const e = entradaDe(O, p);
-    c.textContent = e ? e.t : '';
+    el.textContent = [pagina(O.libro.paginas, p, c || 0), e ? e.t : ''].filter(Boolean).join(' · ');
   }
 
   /** Lleva la vista al párrafo `p` (pintando su tramo si hace falta). */
@@ -584,14 +649,12 @@
     const suena = L.sonando === O && est !== 'parada';
     let pos = O.libro.pos || { p: 0, f: 0 };
     if (suena) {
-      const k = Voz.estado().i;
-      const p = O.trozos[k].parrafo;
-      pos = { p: p, f: k - O.primero[p] };
+      pos = posDe(O, Voz.estado().i);
     }
     const visto = primerVisible();
     O.libro.leeNotas = !leeNotas(O);
     Biblioteca.cambia(O.libro.id, { leeNotas: O.libro.leeNotas }).catch(() => {});
-    if (callada(O, pos.p)) pos = { p: pos.p, f: 0 };
+    if (callada(O, pos.p)) pos = { p: pos.p, f: 0, c: 0 };
     O.trozos = null;
     O.rangos = new Map();
     prepara(O);
@@ -602,8 +665,7 @@
       Voz.lee(O.trozos, k, { voz: Voz.estado().voz, vel: +A.vel || 1, titulo: O.libro.titulo });
     } else if (suena) {
       Voz.para();
-      const p = O.trozos[k].parrafo;
-      O.libro.pos = { p: p, f: k - O.primero[p] };
+      O.libro.pos = posDe(O, k);
       Biblioteca.cambia(O.libro.id, { pos: O.libro.pos }).catch(() => {});
     }
     // la vista se queda donde estaba (o en lo que sigue, si era una nota)
@@ -742,8 +804,7 @@
   Voz.on('trozo', (k) => {
     const O = L.sonando;
     if (!O || !O.trozos[k]) return;
-    const p = O.trozos[k].parrafo;
-    O.libro.pos = { p: p, f: k - O.primero[p] };
+    O.libro.pos = posDe(O, k);
     Biblioteca.cambia(O.libro.id, { pos: O.libro.pos }).catch(() => {});
     if (L.vista === O) {
       resalta(O, k);
@@ -792,7 +853,7 @@
     const k = Voz.estado().i;
     const p = O.trozos[k].parrafo;
     if (tramoDe(O, p) !== L.tramo) { pintaTramo(O, tramoDe(O, p)); suave = false; }
-    pintaCapitulo(O, p);
+    pintaCapitulo(O, p, posDe(O, k).c);
     const el = $('[data-i="' + p + '"]');
     if (!el) return;
     const rg = resalta(O, k);
@@ -846,7 +907,7 @@
       if (p === null) return;
       pintaCapitulo(O, p);
       if (O.libro.pos && O.libro.pos.p === p) return;
-      O.libro.pos = { p: p, f: 0 };
+      O.libro.pos = { p: p, f: 0, c: 0 };
       Biblioteca.cambia(O.libro.id, { pos: O.libro.pos }).catch(() => {});
     }, 700);
   }
