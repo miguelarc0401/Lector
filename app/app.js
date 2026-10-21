@@ -28,10 +28,13 @@
   /* ------------------------------------------------------------ ajustes */
 
   const CLAVE = 'lector-ajustes';
-  const A = Object.assign({ voces: {}, vel: 1 }, (() => {
+  const A = Object.assign({ voces: {}, vel: 1, tema: 'auto' }, (() => {
     try { return JSON.parse(localStorage.getItem(CLAVE) || '{}'); }
     catch (_) { return {}; }
   })());
+  // cómo se ve el libro: lo que cambia el panel Aa
+  A.lec = Object.assign({ modo: 'paginas', letra: 100, fuente: 'serif',
+    interlinea: 'normal', margen: 'normal', justifica: 'si' }, A.lec || {});
 
   // las velocidades que se pueden elegir, en la cinta y en Ajustes:
   // de 0,1 en 0,1, de 0,6 a 2
@@ -65,6 +68,34 @@
     try { localStorage.setItem(CLAVE, JSON.stringify(A)); } catch (_) { /* */ }
   }
 
+  /* El aspecto: el tema vale para toda la app; la letra, los renglones y
+   * los márgenes, para el texto del libro (variables de estilos.css). */
+  const FUENTES = {
+    serif: 'Georgia, "Noto Serif", "Times New Roman", serif',
+    sans: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif'
+  };
+  const INTERLINEAS = { junta: 1.45, normal: 1.65, amplia: 1.9 };
+  const MARGENES = { estrecho: '.9rem', normal: '1.4rem', ancho: '2.6rem' };
+  const LETRAS = [80, 90, 100, 110, 120, 135, 150, 170, 190];
+
+  function aplicaAspecto() {
+    const r = document.documentElement;
+    if (A.tema && A.tema !== 'auto') r.dataset.tema = A.tema;
+    else delete r.dataset.tema;
+    const l = A.lec;
+    r.style.setProperty('--fuente', FUENTES[l.fuente] || FUENTES.serif);
+    r.style.setProperty('--letra', (1.15 * (l.letra || 100) / 100).toFixed(3) + 'rem');
+    r.style.setProperty('--interlinea', INTERLINEAS[l.interlinea] || INTERLINEAS.normal);
+    r.style.setProperty('--margen', MARGENES[l.margen] || MARGENES.normal);
+    r.style.setProperty('--alinea', l.justifica === 'no' ? 'left' : 'justify');
+    const m = document.querySelector('meta[name="theme-color"]');
+    if (m) m.content = getComputedStyle(document.body).backgroundColor || '#8a3b12';
+  }
+  aplicaAspecto();
+  if (window.matchMedia) {
+    matchMedia('(prefers-color-scheme: dark)').addEventListener('change', aplicaAspecto);
+  }
+
   /** La voz con que se lee una lengua: la elegida en Ajustes, o la primera
    *  que haya para ella. */
   function vozDe(lengua) {
@@ -89,8 +120,16 @@
     sigue: true,     // la vista va detrás de la frase que suena
     mueve: false,    // el dedo ha movido el texto desde la última vez
     hay: {},         // voz -> está bajada
-    urls: []         // portadas pintadas, para soltarlas
+    urls: [],        // portadas pintadas, para soltarlas
+    sueno: null,     // el temporizador: { hasta } (una hora) o { parrafo } (fin del capítulo)
+    ro: null         // el que mira el tamaño de la hoja, en páginas
   };
+
+  /* Las páginas del tramo pintado (sólo leyendo por páginas): cuántas son,
+   * cuál se ve, cuánto se corre el texto de una a otra, y el «ancla», la
+   * letra con que empieza la que se ve, para no perderla si cambia la
+   * medida de la hoja (girar el teléfono, cambiar la letra). */
+  const P = { pagina: 0, total: 1, paso: 0, ancla: null };
 
   function abierto(libro, texto) {
     const O = { libro: libro, t: texto.t, h: texto.h || {}, k: texto.k || {},
@@ -246,6 +285,9 @@
     L.vista = null;
     L.tramo = -1;
     document.body.dataset.vista = r.vista;
+    document.body.classList.remove('paginas', 'inmersivo');
+    if (L.ro) { L.ro.disconnect(); L.ro = null; }
+    document.querySelectorAll('dialog[open]').forEach((d) => d.close());
     if (window.CSS && CSS.highlights) CSS.highlights.delete('suena');
     try {
       if (r.vista === 'libro') await pintaLibro(r.id);
@@ -268,15 +310,14 @@
     const libros = await Biblioteca.libros();
     const est = Voz.estado().estado;
     const suena = L.sonando && est !== 'parada' ? L.sonando.libro.id : null;
+    const tapaDe = (l) => {
+      if (!l.portada) return '<span>' + esc((l.titulo || '?').trim().slice(0, 1).toUpperCase()) + '</span>';
+      const u = URL.createObjectURL(l.portada);
+      L.urls.push(u);
+      return '<img src="' + u + '" alt="">';
+    };
     const fichas = libros.map((l) => {
-      let tapa;
-      if (l.portada) {
-        const u = URL.createObjectURL(l.portada);
-        L.urls.push(u);
-        tapa = '<img src="' + u + '" alt="">';
-      } else {
-        tapa = '<span>' + esc((l.titulo || '?').trim().slice(0, 1).toUpperCase()) + '</span>';
-      }
+      const tapa = tapaDe(l);
       const pos = (l.pos && l.pos.p) || 0;
       const pct = l.n ? Math.round((100 * pos) / l.n) : 0;
       const pag = pagina(l.paginas, pos, (l.pos && l.pos.c) || 0);
@@ -292,16 +333,35 @@
         + '<button type="button" class="quita" data-id="' + esc(l.id) + '" aria-label="Quitar «'
         + esc(l.titulo) + '»">×</button></li>';
     });
+    // el último que se abrió, en grande, para seguir con un toque
+    const ult = libros.find((l) => l.abierto);
+    let seguir = '';
+    if (ult) {
+      const pos = (ult.pos && ult.pos.p) || 0;
+      const pct = ult.n ? Math.round((100 * pos) / ult.n) : 0;
+      const pag = pagina(ult.paginas, pos, (ult.pos && ult.pos.c) || 0);
+      const e = entradaDe({ plano: aplanaIndice(ult.indice || []) }, pos);
+      seguir = '<a class="seguir" href="#/libro/' + encodeURIComponent(ult.id) + '">'
+        + '<div class="tapa">' + tapaDe(ult) + '</div>'
+        + '<div class="datos"><span class="rotulo">'
+        + (suena === ult.id ? (est === 'pausada' ? 'En pausa' : 'Sonando') : 'Seguir leyendo') + '</span>'
+        + '<b>' + esc(ult.titulo) + '</b>'
+        + (e ? '<span class="nota donde">' + esc(e.t) + '</span>' : '')
+        + '<div class="barra"><div style="width:' + pct + '%"></div></div>'
+        + '<span class="nota">' + pct + ' %' + (pag ? ' · ' + esc(pag) : '') + '</span>'
+        + '<span class="boton principal">▶ Seguir</span></div></a>';
+    }
     vista.innerHTML = '<main>'
       + '<header class="portadilla"><div><h1>Lector</h1>'
       + '<p class="sub">Libros en voz alta, sin conexión.</p></div>'
       + '<a class="boton" href="#/ajustes">Ajustes</a></header>'
-      + '<div class="botones"><label class="boton principal">Abrir un libro'
+      + seguir
+      + '<div class="botones"><label class="boton' + (seguir ? '' : ' principal') + '">Abrir un libro'
       + '<input type="file" id="archivo" hidden accept=".epub,.txt,.md,application/epub+zip,text/plain,text/markdown">'
       + '</label></div>'
       + '<p class="nota" id="importa-estado">' + esc(textoImporta()) + '</p>'
       + '<div id="nube" class="nube" hidden></div>'
-      + (fichas.length ? '<ul class="fichas">' + fichas.join('') + '</ul>'
+      + (fichas.length ? '<h2 class="biblio-titulo">Biblioteca</h2><ul class="fichas">' + fichas.join('') + '</ul>'
         : '<section class="tarjeta"><h2>Todavía no hay libros</h2><p>Abre un '
           + 'EPUB o un TXT: se guarda aquí, con su índice, y se puede escuchar '
           + 'sin conexión desde cualquier párrafo.</p></section>')
@@ -480,20 +540,30 @@
       }).catch(() => {});
     }
 
+    document.body.classList.toggle('paginas', A.lec.modo === 'paginas');
     vista.innerHTML = '<header class="cabeza">'
       + '<a class="boton icono" href="#/" aria-label="Biblioteca">←</a>'
       + '<div class="rotulos"><b>' + esc(O.libro.titulo) + '</b>'
       + '<span id="capitulo" class="nota"></span></div>'
       + (O.hayNotas ? '<button type="button" class="boton" id="b-notas"></button>' : '')
-      + '<button type="button" class="boton" id="b-indice">Índice</button></header>'
-      + '<main class="lectura"><article id="texto" class="texto" lang="'
-      + esc(O.libro.lengua || 'es') + '"></article></main>'
+      + '<button type="button" class="boton icono" id="b-indice" aria-label="Índice" title="Índice">☰</button>'
+      + '</header>'
+      + '<main class="lectura">'
+      + '<div id="cornisa" class="cornisa" title="Ver sólo la página, o los mandos"></div>'
+      + '<div id="hoja"><article id="texto" class="texto" lang="'
+      + esc(O.libro.lengua || 'es') + '"></article></div>'
+      + '<div id="folio" class="folio" title="Ver sólo la página, o los mandos"></div></main>'
       + '<button type="button" id="b-sigue" class="boton principal flota" hidden>Ir a lo que suena</button>'
       + '<footer class="mandos"><p id="voz-aviso" class="nota" aria-live="polite"></p>'
+      + '<div class="avance"><span id="av-pag"></span>'
+      + '<input type="range" id="avance" min="0" max="' + Math.max(0, O.t.length - 1)
+      + '" step="1" aria-label="Avance en el libro"><span id="av-pct"></span></div>'
       + '<div class="fila">'
+      + '<button type="button" id="b-sueno" class="lado" aria-label="Temporizador: apagar la voz dentro de un rato" title="Temporizador">☾</button>'
       + '<button type="button" id="b-atras" aria-label="Frase anterior">⏮</button>'
       + '<button type="button" id="b-dice" class="principal grande" aria-label="Leer">▶</button>'
       + '<button type="button" id="b-adelante" aria-label="Frase siguiente">⏭</button>'
+      + '<button type="button" id="b-aspecto" class="lado" aria-label="Aspecto: páginas, letra y tema" title="Aspecto">Aa</button>'
       + '</div><div class="fila velocidad">'
       + '<button type="button" id="b-lento" aria-label="Más despacio">−</button>'
       + '<span id="vel" aria-live="polite"></span>'
@@ -515,20 +585,28 @@
     $('#b-adelante').addEventListener('click', () => salta(O, +1));
     $('#b-lento').addEventListener('click', () => ponVelocidad(-1));
     $('#b-rapido').addEventListener('click', () => ponVelocidad(+1));
+    $('#b-sueno').addEventListener('click', () => abreSueno(O));
+    $('#b-aspecto').addEventListener('click', () => abreAspecto(O));
     pintaVelocidad();
-    $('#texto').addEventListener('click', (ev) => toca(O, ev));
+    pintaSueno();
+    const hoja = $('#hoja');
+    hoja.addEventListener('click', (ev) => tocaHoja(O, ev));
+    gestos(hoja);
+    ['#cornisa', '#folio'].forEach((s) => $(s).addEventListener('click', () =>
+      ponInmersivo(!document.body.classList.contains('inmersivo'))));
+    cintaDeAvance(O);
 
     const suenaEste = L.sonando === O && Voz.estado().estado !== 'parada';
     L.sigue = true;
-    const p = suenaEste ? O.trozos[Voz.estado().i].parrafo : (O.libro.pos || {}).p || 0;
+    const pos = O.libro.pos || {};
+    const p = suenaEste ? O.trozos[Voz.estado().i].parrafo : pos.p || 0;
     pintaTramo(O, tramoDe(O, p));
     pintaEstado();
     if (suenaEste) sigueALaVoz(false);
-    else {
-      irA(p, false);
-      pintaCapitulo(O, p, (O.libro.pos || {}).c);
-    }
+    else irA(p, false, pos.c || 0);
+    observaHoja();
     miraLaVoz(O);
+    ayudaPaginas();
   }
 
   function pintaTramo(O, i) {
@@ -536,8 +614,11 @@
     if (!art) return;
     const tr = O.tramos[i];
     L.tramo = i;
+    // por páginas, de un tramo a otro se pasa como de página: sin botones
+    const pag = enPaginas();
     const f = document.createDocumentFragment();
-    if (i > 0) f.appendChild(botonTramo(O, i - 1, '← '));
+    if (i > 0 && !pag) f.appendChild(botonTramo(O, i - 1, '← '));
+    let capitular = false;   // el primer párrafo de un capítulo lleva letra capitular
     for (let p = tr.desde; p < tr.hasta; p++) {
       const n = O.h[p];
       const el = document.createElement(n ? (n === 1 ? 'h2' : n === 2 ? 'h3' : 'h4') : 'p');
@@ -546,11 +627,17 @@
       if (O.k[p]) {
         el.className = 'nota-pie';
         el.hidden = callada(O, p);
+      } else if (n === 1 || n === 2) {
+        capitular = true;
+      } else if (!n && capitular) {
+        if (/^\p{L}/u.test(O.t[p])) el.className = 'capitular';
+        capitular = false;
       }
       f.appendChild(el);
     }
-    if (i < O.tramos.length - 1) f.appendChild(botonTramo(O, i + 1, '', ' →'));
+    if (i < O.tramos.length - 1 && !pag) f.appendChild(botonTramo(O, i + 1, '', ' →'));
     art.replaceChildren(f);
+    maqueta();
     pintaCapitulo(O, tr.desde);
     if (L.sonando === O && Voz.estado().estado !== 'parada') resalta(O, Voz.estado().i);
   }
@@ -573,25 +660,512 @@
     return b;
   }
 
-  /** En la cabecera, la página y el capítulo de la letra `c` del párrafo
-   *  `p` (lo que suena o lo que se ve). */
+  /** La página y el capítulo de la letra `c` del párrafo `p` (lo que suena
+   *  o lo que se ve): en la cabecera, en la cornisa y el folio de la página,
+   *  y en la cinta del avance. */
   function pintaCapitulo(O, p, c) {
     const el = $('#capitulo');
     if (!el) return;
     const e = entradaDe(O, p);
-    el.textContent = [pagina(O.libro.paginas, p, c || 0), e ? e.t : ''].filter(Boolean).join(' · ');
+    const pag = pagina(O.libro.paginas, p, c || 0);
+    el.textContent = [pag, e ? e.t : ''].filter(Boolean).join(' · ');
+    // en una página que empieza por títulos, cuenta el capítulo que empiezan
+    let q = p;
+    while (O.h[q] && q < O.t.length - 1) { q++; c = 0; }
+    const cap = capituloDe(O, q);
+    $('#cornisa').textContent = cap ? cap.t : O.libro.titulo;
+    $('#folio').textContent = [pag.replace(/^p\. (.*)\/(.*)$/, 'p. $1 de $2'),
+      quedan(O, q, c || 0)].filter(Boolean).join(' · ');
+    const pct = O.t.length > 1 ? Math.round((100 * p) / (O.t.length - 1)) : 0;
+    const av = $('#avance');
+    if (av && !L.arrastra) av.value = p;
+    $('#av-pag').textContent = pag.replace(/\/.*$/, '');
+    $('#av-pct').textContent = pct + ' %';
   }
 
-  /** Lleva la vista al párrafo `p` (pintando su tramo si hace falta). */
-  function irA(p, suave) {
+  /** El capítulo en que cae un párrafo: la entrada de primer nivel del
+   *  índice, o la de segundo si el primero son partes (pocas y con hijos). */
+  function capituloDe(O, p) {
+    if (O.nivelCap === undefined) {
+      const n0 = O.plano.filter((e) => e.nivel === 0).length;
+      const n1 = O.plano.filter((e) => e.nivel === 1).length;
+      O.nivelCap = n1 > 0 && n1 >= n0 ? 1 : 0;
+    }
+    let r = null;
+    for (const e of O.plano) {
+      if (e.p > p) break;
+      if (e.nivel <= O.nivelCap) r = e;
+    }
+    return r;
+  }
+
+  /** Dónde acaba el capítulo del párrafo `p`: el primer párrafo del que
+   *  sigue (o el final del libro). */
+  function finCapitulo(O, p) {
+    const cap = capituloDe(O, p);
+    if (!cap) return O.t.length;
+    const sig = O.plano.find((e) => e.p > cap.p && e.nivel <= O.nivelCap);
+    return sig ? sig.p : O.t.length;
+  }
+
+  /** Las palabras del libro, sumadas párrafo a párrafo (sin las notas que
+   *  se callan): para saber cuánto falta. */
+  function palabras(O) {
+    if (O.pal) return O.pal;
+    const r = new Float64Array(O.t.length + 1);
+    for (let i = 0; i < O.t.length; i++) {
+      r[i + 1] = r[i] + (callada(O, i) ? 0 : O.t[i].split(' ').length);
+    }
+    O.pal = r;
+    return r;
+  }
+
+  /** «quedan 12 min del capítulo», a la velocidad de la voz (unas 150
+   *  palabras por minuto a 1×). */
+  function quedan(O, p, c) {
+    const w = palabras(O);
+    const fin = finCapitulo(O, p);
+    const n = w[fin] - w[p] - (c ? O.t[p].slice(0, c).split(' ').length - 1 : 0);
+    if (n <= 0) return '';
+    const m = Math.round(n / (150 * (+A.vel || 1)));
+    const de = capituloDe(O, p) ? ' del capítulo' : ' del libro';
+    if (m < 1) return 'menos de 1 min' + de;
+    if (m < 60) return 'quedan ' + m + ' min' + de;
+    return 'quedan ' + Math.floor(m / 60) + ' h' + (m % 60 ? ' ' + (m % 60) + ' min' : '') + de;
+  }
+
+  /** Lleva la vista al párrafo `p` (pintando su tramo si hace falta); por
+   *  páginas, a la página de su letra `c`. */
+  function irA(p, suave, c) {
     const O = L.vista;
     if (!O) return;
     const t = tramoDe(O, p);
     if (t !== L.tramo) pintaTramo(O, t);
-    const el = $('[data-i="' + p + '"]');
-    if (el) el.scrollIntoView({ block: 'start', behavior: suave ? 'smooth' : 'auto' });
-    else window.scrollTo(0, 0);
-    pintaCapitulo(O, p);
+    if (enPaginas()) {
+      P.ancla = { p: p, c: c || 0 };
+      muestra(paginaDe(p, c || 0), suave);
+    } else {
+      const el = $('[data-i="' + p + '"]');
+      if (el) el.scrollIntoView({ block: 'start', behavior: suave ? 'smooth' : 'auto' });
+      else window.scrollTo(0, 0);
+    }
+    pintaCapitulo(O, p, c);
+  }
+
+  /* --------------------------------------------------------- las páginas */
+
+  const enPaginas = () => document.body.classList.contains('paginas');
+
+  /** Mide la hoja y pone el tramo en columnas de su medida: una página por
+   *  columna, o dos columnas por página si la hoja es ancha. Se queda en la
+   *  primera página. */
+  function maqueta() {
+    const art = $('#texto');
+    const hoja = $('#hoja');
+    if (!art || !hoja) return;
+    if (!enPaginas()) { art.removeAttribute('style'); return; }
+    const cs = getComputedStyle(hoja);
+    const m = parseFloat(cs.paddingLeft) || 0;
+    const ancho = Math.floor(hoja.clientWidth - m - (parseFloat(cs.paddingRight) || 0));
+    const alto = Math.floor(hoja.clientHeight - (parseFloat(cs.paddingTop) || 0)
+      - (parseFloat(cs.paddingBottom) || 0));
+    const hueco = Math.max(2 * m, 28);
+    const dos = ancho >= 860;
+    const col = dos ? Math.floor((ancho - hueco) / 2) : ancho;
+    const w = dos ? 2 * col + hueco : col;
+    Object.assign(art.style, { width: w + 'px', height: Math.max(80, alto) + 'px',
+      columnWidth: col + 'px', columnGap: hueco + 'px' });
+    P.paso = w + hueco;
+    P.medida = hoja.clientWidth + 'x' + hoja.clientHeight;
+    cuentaPaginas();
+    muestra(0, false);
+  }
+
+  /** En qué página cae algo que empieza en la `x` de la pantalla. */
+  function paginaDeX(x) {
+    const art = $('#texto');
+    if (!art || !P.paso) return 0;
+    return Math.max(0, Math.floor((x - art.getBoundingClientRect().left + 2) / P.paso));
+  }
+
+  function cuentaPaginas() {
+    const art = $('#texto');
+    let ult = art && art.lastElementChild;
+    while (ult && ult.hidden) ult = ult.previousElementSibling;
+    P.total = 1;
+    const r = ult ? ult.getClientRects() : [];
+    if (r.length) P.total = paginaDeX(r[r.length - 1].left) + 1;
+  }
+
+  /** Muestra la página `n` del tramo, deslizándola si `anima`. */
+  function muestra(n, anima) {
+    const art = $('#texto');
+    if (!art || !enPaginas()) return;
+    P.pagina = Math.max(0, Math.min(P.total - 1, n));
+    art.style.transition = anima ? '' : 'none';
+    art.style.transform = 'translateX(' + (-P.pagina * P.paso) + 'px)';
+    if (!anima) {
+      void art.offsetWidth;
+      art.style.transition = '';
+    }
+  }
+
+  /** La página en que cae la letra `c` del párrafo `p` del tramo. */
+  function paginaDe(p, c) {
+    let el = $('#texto [data-i="' + p + '"]');
+    while (el && el.hidden) { el = el.nextElementSibling; c = 0; }
+    if (!el) return 0;
+    const t = el.firstChild;
+    let r = null;
+    // por la letra, no por la caja del párrafo: la caja puede empezar con un
+    // trozo vacío al pie de la página de antes
+    if (t && t.nodeType === 3 && t.length) {
+      const g = document.createRange();
+      const i = Math.min(c, t.length - 1);
+      g.setStart(t, i);
+      g.setEnd(t, i + 1);
+      r = g.getClientRects()[0];
+    }
+    if (!r) r = el.getClientRects()[0];
+    return r ? paginaDeX(r.left) : 0;
+  }
+
+  /** La primera letra de la página `n`: { p, c }. Si la página empieza a
+   *  media frase, se busca la letra a saltos (como en un diccionario). */
+  function anclaDe(n) {
+    const art = $('#texto');
+    if (!art) return null;
+    for (const el of art.children) {
+      if (el.hidden || el.dataset.i === undefined) continue;
+      const rs = el.getClientRects();
+      if (!rs.length || paginaDeX(rs[rs.length - 1].left) < n) continue;
+      const p = +el.dataset.i;
+      const t = el.firstChild;
+      if (paginaDeX(rs[0].left) >= n || !t || t.nodeType !== 3) return { p: p, c: 0 };
+      let lo = 0;
+      let hi = t.length - 1;
+      const g = document.createRange();
+      while (lo < hi) {
+        const m = (lo + hi) >> 1;
+        g.setStart(t, m);
+        g.setEnd(t, m + 1);
+        const r = g.getClientRects()[0];
+        if (!r || paginaDeX(r.left) < n) lo = m + 1;
+        else hi = m;
+      }
+      return { p: p, c: lo };
+    }
+    return null;
+  }
+
+  /** Pasa una página adelante (+1) o atrás (-1); en el borde del tramo,
+   *  pinta el de al lado. */
+  function pasaPagina(d) {
+    const O = L.vista;
+    if (!O || !enPaginas()) return;
+    const n = P.pagina + d;
+    if (n < 0) {
+      if (L.tramo <= 0) { muestra(0, true); return; }
+      pintaTramo(O, L.tramo - 1);
+      muestra(P.total - 1, false);
+    } else if (n >= P.total) {
+      if (L.tramo >= O.tramos.length - 1) { muestra(P.total - 1, true); return; }
+      pintaTramo(O, L.tramo + 1);
+      muestra(0, false);
+    } else {
+      muestra(n, true);
+    }
+    dejaDeSeguir();
+    P.ancla = anclaDe(P.pagina);
+    if (P.ancla) pintaCapitulo(O, P.ancla.p, P.ancla.c);
+    apuntaVista();
+  }
+
+  /** Vuelve a partir en páginas si la hoja ha cambiado de medida (o si
+   *  `forzar`, porque cambió la letra), sin perder lo que se leía. */
+  let _remaqueta = 0;
+  function remaqueta(forzar) {
+    clearTimeout(_remaqueta);
+    _remaqueta = setTimeout(() => {
+      const O = L.vista;
+      const hoja = $('#hoja');
+      if (!O || !hoja || !enPaginas()) return;
+      if (!forzar && P.medida === hoja.clientWidth + 'x' + hoja.clientHeight) return;
+      const a = P.ancla;
+      maqueta();
+      if (L.sonando === O && L.sigue && Voz.estado().estado !== 'parada') {
+        sigueALaVoz(false);
+        return;
+      }
+      if (a) {
+        muestra(paginaDe(a.p, a.c), false);
+        P.ancla = a;
+        pintaCapitulo(O, a.p, a.c);
+      }
+    }, 30);
+  }
+
+  function observaHoja() {
+    if (L.ro) { L.ro.disconnect(); L.ro = null; }
+    const hoja = $('#hoja');
+    if (!hoja || !enPaginas() || !window.ResizeObserver) return;
+    L.ro = new ResizeObserver(() => remaqueta());
+    L.ro.observe(hoja);
+  }
+
+  /** Sólo la página, sin cabecera ni mandos (o volverlos a ver). */
+  function ponInmersivo(si) {
+    if (!enPaginas()) si = false;
+    document.body.classList.toggle('inmersivo', !!si);
+  }
+
+  /** Tocar la hoja: por páginas, los lados pasan de página; en medio, una
+   *  frase se lee desde ahí (o, sólo con la página, vuelven los mandos). */
+  function tocaHoja(O, ev) {
+    if (Date.now() < (L.sinClic || 0)) return;
+    if (enPaginas()) {
+      const r = $('#hoja').getBoundingClientRect();
+      const x = (ev.clientX - r.left) / r.width;
+      if (x < 0.25) { pasaPagina(-1); return; }
+      if (x > 0.75) { pasaPagina(+1); return; }
+      if (document.body.classList.contains('inmersivo')) { ponInmersivo(false); return; }
+      if (!ev.target.closest('[data-i]')) { ponInmersivo(true); return; }
+    }
+    toca(O, ev);
+  }
+
+  /** Por páginas, el dedo arrastra la página y, si va lo bastante, la pasa;
+   *  la rueda del ratón también pasa de página. */
+  function gestos(hoja) {
+    let t0 = null;
+    hoja.addEventListener('touchstart', (ev) => {
+      t0 = enPaginas() && ev.touches.length === 1
+        ? { x: ev.touches[0].clientX, y: ev.touches[0].clientY, t: Date.now(), lado: false, dx: 0 }
+        : null;
+    }, { passive: true });
+    hoja.addEventListener('touchmove', (ev) => {
+      if (!t0 || !L.vista) return;
+      if (ev.touches.length > 1) { t0 = null; muestra(P.pagina, true); return; }
+      const dx = ev.touches[0].clientX - t0.x;
+      const dy = ev.touches[0].clientY - t0.y;
+      if (!t0.lado) {
+        if (Math.abs(dy) > 12 && Math.abs(dy) > Math.abs(dx)) { t0 = null; return; }
+        if (Math.abs(dx) < 10) return;
+        t0.lado = true;
+      }
+      // en la primera y en la última del libro, la página se resiste
+      const tope = (dx > 0 && P.pagina === 0 && L.tramo === 0)
+        || (dx < 0 && P.pagina === P.total - 1 && L.tramo === L.vista.tramos.length - 1);
+      t0.dx = dx;
+      const art = $('#texto');
+      art.style.transition = 'none';
+      art.style.transform = 'translateX(' + (-P.pagina * P.paso + (tope ? dx / 4 : dx)) + 'px)';
+    }, { passive: true });
+    const suelta = () => {
+      const t = t0;
+      t0 = null;
+      if (!t || !t.lado) return;
+      L.sinClic = Date.now() + 400;
+      $('#texto').style.transition = '';
+      const rapido = Math.abs(t.dx) / Math.max(1, Date.now() - t.t) > 0.35;
+      if (Math.abs(t.dx) > 60 || (rapido && Math.abs(t.dx) > 20)) pasaPagina(t.dx < 0 ? 1 : -1);
+      else muestra(P.pagina, true);
+    };
+    hoja.addEventListener('touchend', suelta);
+    hoja.addEventListener('touchcancel', suelta);
+    hoja.addEventListener('wheel', (ev) => {
+      if (!enPaginas() || ev.ctrlKey) return;
+      ev.preventDefault();
+      const d = Math.abs(ev.deltaX) > Math.abs(ev.deltaY) ? ev.deltaX : ev.deltaY;
+      if (Math.abs(d) < 4 || Date.now() < (L.rueda || 0)) return;
+      L.rueda = Date.now() + 380;
+      pasaPagina(d > 0 ? 1 : -1);
+    }, { passive: false });
+  }
+
+  // con teclado: las flechas y Re Pág / Av Pág pasan de página
+  document.addEventListener('keydown', (ev) => {
+    if (!L.vista || !enPaginas() || document.querySelector('dialog[open]')) return;
+    if (ev.altKey || ev.ctrlKey || ev.metaKey) return;
+    if (ev.target.closest && ev.target.closest('input, select, textarea')) return;
+    const k = ev.key;
+    if (k === 'ArrowRight' || k === 'PageDown') { ev.preventDefault(); pasaPagina(+1); }
+    else if (k === 'ArrowLeft' || k === 'PageUp') { ev.preventDefault(); pasaPagina(-1); }
+    else if (k === 'Escape') ponInmersivo(false);
+  });
+
+  /** La primera vez que se lee por páginas: dónde tocar. */
+  function ayudaPaginas() {
+    if (!enPaginas() || A.vistaAyuda) return;
+    const d = document.createElement('div');
+    d.className = 'ayuda';
+    d.innerHTML = '<div><b>‹</b>Página anterior</div>'
+      + '<div class="medio"><span>Toca una frase<br>para oírla desde ahí</span>'
+      + '<span>Toca el número de página<br>para ver sólo la página</span>'
+      + '<button type="button" class="principal">Entendido</button></div>'
+      + '<div><b>›</b>Página siguiente</div>';
+    d.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      d.remove();
+      A.vistaAyuda = true;
+      guardaAjustes();
+    });
+    $('#hoja').appendChild(d);
+  }
+
+  /** La cinta del avance: arrastrarla dice adónde se va, y soltarla va. */
+  function cintaDeAvance(O) {
+    const av = $('#avance');
+    av.addEventListener('input', () => {
+      L.arrastra = true;
+      const p = +av.value;
+      const e = entradaDe(O, p);
+      aviso([pagina(O.libro.paginas, p, 0), e ? e.t : ''].filter(Boolean).join(' · '));
+    });
+    av.addEventListener('change', () => {
+      L.arrastra = false;
+      aviso('');
+      dejaDeSeguir();
+      let p = +av.value;
+      while (p < O.t.length - 1 && callada(O, p)) p++;
+      irA(p, false, 0);
+      apuntaVista();
+    });
+  }
+
+  /* ----------------------------------------------------- el panel Aa */
+
+  function abreAspecto(O) {
+    const d = $('#d-aspecto');
+    const marca = () => {
+      d.querySelectorAll('[data-ajuste]').forEach((g) => {
+        const k = g.dataset.ajuste;
+        const v = k === 'tema' ? A.tema || 'auto' : A.lec[k];
+        g.querySelectorAll('button[data-v]').forEach((b) =>
+          b.setAttribute('aria-pressed', b.dataset.v === v ? 'true' : 'false'));
+      });
+      $('#da-letra').textContent = A.lec.letra + ' %';
+      $('#da-menos').disabled = A.lec.letra <= LETRAS[0];
+      $('#da-mas').disabled = A.lec.letra >= LETRAS[LETRAS.length - 1];
+      $('#da-completa').hidden = A.lec.modo !== 'paginas';
+    };
+    const cambiado = (k) => {
+      guardaAjustes();
+      aplicaAspecto();
+      marca();
+      if (k !== 'tema' && k !== 'modo') remaqueta(true);
+    };
+    d.onclick = (ev) => {
+      const b = ev.target.closest('[data-ajuste] button[data-v]');
+      if (!b) return;
+      const k = b.closest('[data-ajuste]').dataset.ajuste;
+      const v = b.dataset.v;
+      if (k === 'tema') A.tema = v;
+      else if (k === 'modo') { if (A.lec.modo !== v) cambiaModo(O, v); }
+      else A.lec[k] = v;
+      cambiado(k);
+    };
+    const letra = (paso) => {
+      let i = LETRAS.indexOf(+A.lec.letra);
+      if (i < 0) i = LETRAS.indexOf(100);
+      A.lec.letra = LETRAS[Math.max(0, Math.min(LETRAS.length - 1, i + paso))];
+      cambiado('letra');
+    };
+    $('#da-menos').onclick = () => letra(-1);
+    $('#da-mas').onclick = () => letra(+1);
+    $('#da-completa').onclick = () => { d.close(); ponInmersivo(true); };
+    marca();
+    d.showModal();
+  }
+
+  /** Por páginas o de corrido, sin moverse de lo que se leía. */
+  function cambiaModo(O, modo) {
+    let a = null;
+    if (enPaginas()) a = P.ancla;
+    else {
+      const p = primerVisible();
+      if (p !== null) a = { p: p, c: 0 };
+    }
+    A.lec.modo = modo;
+    document.body.classList.toggle('paginas', modo === 'paginas');
+    document.body.classList.remove('inmersivo');
+    pintaTramo(O, L.tramo);
+    window.scrollTo(0, 0);
+    observaHoja();
+    if (L.sonando === O && L.sigue && Voz.estado().estado !== 'parada') sigueALaVoz(false);
+    else if (a) irA(a.p, false, a.c);
+    ayudaPaginas();
+  }
+
+  /* -------------------------------------------------- el temporizador */
+
+  /** Apagar la voz dentro de un rato, o al acabar el capítulo: se para al
+   *  empezar la frase siguiente, así no corta ninguna a medias. */
+  function abreSueno(O) {
+    const d = $('#d-sueno');
+    const ul = $('#sueno-lista');
+    const s = L.sueno;
+    const op = [['cap', 'Al acabar el capítulo']]
+      .concat([10, 20, 30, 45, 60, 90].map((m) => [String(m), 'Dentro de ' + m + ' min']))
+      .concat(s ? [['no', 'Quitar el temporizador']] : []);
+    ul.innerHTML = op.map((x) => {
+      const yo = s && ((x[0] === 'cap' && s.parrafo !== undefined) || String(s.min) === x[0]);
+      return '<li><button type="button" data-v="' + x[0] + '"' + (yo ? ' aria-pressed="true"' : '')
+        + '>' + esc(x[1]) + '</button></li>';
+    }).join('');
+    ul.onclick = (ev) => {
+      const b = ev.target.closest('button[data-v]');
+      if (!b) return;
+      d.close();
+      ponSueno(O, b.dataset.v);
+    };
+    d.showModal();
+  }
+
+  function ponSueno(O, v) {
+    if (v === 'no') {
+      L.sueno = null;
+      aviso('Sin temporizador.');
+    } else if (v === 'cap') {
+      const suena = L.sonando === O && Voz.estado().estado !== 'parada';
+      const p = suena ? O.trozos[Voz.estado().i].parrafo : (O.libro.pos || {}).p || 0;
+      L.sueno = { parrafo: finCapitulo(O, p), libro: O.libro.id };
+      aviso('La voz se apagará al acabar el capítulo.');
+    } else {
+      L.sueno = { hasta: Date.now() + v * 60000, min: +v };
+      aviso('La voz se apagará dentro de ' + v + ' min.');
+    }
+    pintaSueno();
+  }
+
+  function pintaSueno() {
+    const b = $('#b-sueno');
+    const s = L.sueno;
+    if (s && s.hasta && Date.now() >= s.hasta && Voz.estado().estado !== 'diciendo') L.sueno = null;
+    if (!b) return;
+    if (!L.sueno) {
+      b.textContent = '☾';
+      b.classList.remove('activo');
+      return;
+    }
+    b.classList.add('activo');
+    b.textContent = L.sueno.hasta
+      ? '☾ ' + Math.max(1, Math.ceil((L.sueno.hasta - Date.now()) / 60000)) + '′'
+      : '☾ cap.';
+  }
+  setInterval(pintaSueno, 15000);
+
+  /** A cada frase, mira si ya toca apagar la voz. */
+  function compruebaSueno(O, k) {
+    const s = L.sueno;
+    if (!s) return;
+    const ya = (s.hasta && Date.now() >= s.hasta)
+      || (s.parrafo !== undefined && s.libro === O.libro.id && O.trozos[k].parrafo >= s.parrafo);
+    if (!ya) return;
+    L.sueno = null;
+    Voz.pausa();
+    pintaSueno();
+    aviso('Voz apagada por el temporizador. Toca ▶ para seguir.');
   }
 
   /* ----------------------------------------------------------- el índice */
@@ -658,6 +1232,7 @@
     if (callada(O, pos.p)) pos = { p: pos.p, f: 0, c: 0 };
     O.trozos = null;
     O.rangos = new Map();
+    O.pal = null;
     prepara(O);
     const k = trozoDe(O, pos);
     pintaNotas(O);
@@ -738,11 +1313,18 @@
     empieza(O, O.primero[p] + f);
   }
 
+  /* El aviso flota sobre la página: se va solo al rato, para no tapar el
+   * texto (los de «Preparando…» se quitan al empezar a sonar). */
+  let _aviso = 0;
   function aviso(t, malo) {
     const a = $('#voz-aviso');
     if (!a) return;
     a.textContent = t || '';
     a.className = malo ? 'mal' : 'nota';
+    clearTimeout(_aviso);
+    if (t && !/…$/.test(t)) {
+      _aviso = setTimeout(() => { if (a.textContent === t) a.textContent = ''; }, malo ? 12000 : 6000);
+    }
   }
 
   function pintaEstado() {
@@ -807,6 +1389,7 @@
     if (!O || !O.trozos[k]) return;
     O.libro.pos = posDe(O, k);
     Biblioteca.cambia(O.libro.id, { pos: O.libro.pos }).catch(() => {});
+    compruebaSueno(O, k);
     if (L.vista === O) {
       resalta(O, k);
       if (L.sigue) sigueALaVoz(true);
@@ -858,6 +1441,14 @@
     const el = $('[data-i="' + p + '"]');
     if (!el) return;
     const rg = resalta(O, k);
+    if (enPaginas()) {
+      // por páginas: se pasa a la página de la frase, si no es la que se ve
+      const r = (rg && rg.getClientRects()[0]) || el.getClientRects()[0];
+      const n = r ? paginaDeX(r.left) : P.pagina;
+      if (n !== P.pagina) muestra(n, suave);
+      P.ancla = { p: p, c: posDe(O, k).c };
+      return;
+    }
     const caja = (rg || el).getBoundingClientRect();
     const arriba = ($('.cabeza') || { offsetHeight: 0 }).offsetHeight;
     const abajo = window.innerHeight - (($('.mandos') || { offsetHeight: 0 }).offsetHeight);
@@ -870,13 +1461,17 @@
     if (L.sonando !== L.vista || Voz.estado().estado === 'parada') return;
     L.sigue = false;
     const b = $('#b-sigue');
-    if (b) b.hidden = false;
+    if (!b) return;
+    b.hidden = false;
+    const m = $('.mandos');
+    b.style.bottom = ((m && m.offsetHeight) || 0) + 18 + 'px';
   }
 
   // el dedo en la pantalla mientras lee: quiere mirar otra cosa, y la vista
-  // deja de ir detrás de la voz hasta que pida volver
+  // deja de ir detrás de la voz hasta que pida volver (por páginas, eso es
+  // pasar de página: lo ve pasaPagina)
   ['touchmove', 'wheel'].forEach((n) => window.addEventListener(n, () => {
-    if (!L.vista) return;
+    if (!L.vista || enPaginas()) return;
     L.mueve = true;
     dejaDeSeguir();
   }, { passive: true }));
@@ -890,6 +1485,10 @@
   function primerVisible() {
     const art = $('#texto');
     if (!art) return null;
+    if (enPaginas()) {
+      const a = anclaDe(P.pagina);
+      return a ? a.p : null;
+    }
     const arriba = ($('.cabeza') || { offsetHeight: 0 }).offsetHeight;
     for (const el of art.querySelectorAll('[data-i]:not([hidden])')) {
       if (el.getBoundingClientRect().bottom > arriba + 4) return +el.dataset.i;
@@ -904,11 +1503,22 @@
       L.mueve = false;
       const O = L.vista;
       if (!O || (L.sonando === O && Voz.estado().estado !== 'parada')) return;
-      const p = primerVisible();
-      if (p === null) return;
-      pintaCapitulo(O, p);
-      if (O.libro.pos && O.libro.pos.p === p) return;
-      O.libro.pos = { p: p, f: 0, c: 0 };
+      let pos;
+      if (enPaginas() && P.ancla) {
+        // por páginas, la frase con que empieza la página: ▶ lee desde ahí
+        const a = P.ancla;
+        let f = 0;
+        if (!callada(O, a.p)) rangos(O, a.p).forEach((x, j) => { if (a.c >= x[0]) f = j; });
+        pos = { p: a.p, f: f, c: a.c };
+      } else {
+        const p = primerVisible();
+        if (p === null) return;
+        pos = { p: p, f: 0, c: 0 };
+      }
+      pintaCapitulo(O, pos.p, pos.c);
+      const ya = O.libro.pos;
+      if (ya && ya.p === pos.p && ya.f === pos.f && (ya.c || 0) === pos.c) return;
+      O.libro.pos = pos;
       Biblioteca.cambia(O.libro.id, { pos: O.libro.pos }).catch(() => {});
     }, 700);
   }
@@ -934,6 +1544,13 @@
         .map((v) => '<option value="' + v + '">' + velTexto(v)
           + (v === 1 ? ' (normal)' : '') + '</option>').join('')
       + '</select></section>'
+      + '<section class="tarjeta"><h2>Tema</h2>'
+      + '<select id="a-tema">'
+      + [['auto', 'Como el teléfono (claro u oscuro)'], ['claro', 'Claro'], ['sepia', 'Sepia'],
+        ['oscuro', 'Oscuro'], ['noche', 'Noche (negro, para leer a oscuras)']]
+        .map((x) => '<option value="' + x[0] + '">' + esc(x[1]) + '</option>').join('')
+      + '</select><p class="nota">La letra, los renglones y leer por páginas o de corrido: '
+      + 'con el botón Aa, dentro del libro.</p></section>'
       + '<section class="tarjeta"><h2>Voces</h2>'
       + '<p class="nota">Una por lengua: la del libro decide cuál suena. El motor '
       + '(29 MB) es común a todas y se baja con la primera.</p>'
@@ -958,6 +1575,13 @@
       A.vel = +vel.value;
       guardaAjustes();
       if (Voz.estado().estado !== 'parada') Voz.cambia({ vel: A.vel });
+    });
+    const tema = $('#a-tema');
+    tema.value = A.tema || 'auto';
+    tema.addEventListener('change', () => {
+      A.tema = tema.value;
+      guardaAjustes();
+      aplicaAspecto();
     });
 
     lenguas.forEach((l) => {

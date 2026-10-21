@@ -1,6 +1,8 @@
 /* Lector — estilos comunes. Pensados para el teléfono primero: mandos
  * grandes, una columna, y el texto que suena bien a la vista. */
 
+/* Los temas: «auto» sigue al teléfono (claro u oscuro); los demás se
+ * eligen en el panel Aa del libro y valen para toda la app. */
 :root {
   --fondo: #f6f3ee;
   --papel: #fffdf9;
@@ -12,11 +14,17 @@
   --bien: #2e6b3a;
   --mal: #a1301f;
   --sombra: 0 1px 2px rgba(40, 30, 20, .08), 0 4px 14px rgba(40, 30, 20, .06);
+  /* la letra del libro, que cambia el panel Aa */
+  --fuente: Georgia, "Noto Serif", "Times New Roman", serif;
+  --letra: 1.15rem;
+  --interlinea: 1.65;
+  --margen: 1.4rem;
+  --alinea: justify;
   color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
+  :root:not([data-tema]) {
     --fondo: #171513;
     --papel: #211e1b;
     --tinta: #ece6dc;
@@ -31,7 +39,7 @@
   }
 }
 
-:root[data-theme="dark"] {
+:root[data-tema="oscuro"] {
   --fondo: #171513;
   --papel: #211e1b;
   --tinta: #ece6dc;
@@ -41,6 +49,34 @@
   --acento-suave: #3b2a1f;
   --bien: #7cc28a;
   --mal: #f08a78;
+  --sombra: none;
+  color-scheme: dark;
+}
+
+/* Sepia, como el papel de un libro viejo */
+:root[data-tema="sepia"] {
+  --fondo: #f3e9d2;
+  --papel: #faf3e1;
+  --tinta: #3d3022;
+  --tenue: #7b6a52;
+  --linea: #e0d1b0;
+  --acento: #8a3b12;
+  --acento-suave: #ead7b5;
+  --sombra: 0 1px 2px rgba(60, 40, 10, .08), 0 4px 14px rgba(60, 40, 10, .06);
+}
+
+/* Noche: negro del todo (gasta menos en las pantallas OLED) y la letra
+ * menos blanca, para leer a oscuras sin deslumbrarse */
+:root[data-tema="noche"] {
+  --fondo: #000;
+  --papel: #0e0d0c;
+  --tinta: #bdb5a9;
+  --tenue: #7f786d;
+  --linea: #2a2724;
+  --acento: #c98652;
+  --acento-suave: #2b1e15;
+  --bien: #6fae7c;
+  --mal: #e07d6c;
   --sombra: none;
   color-scheme: dark;
 }
@@ -312,9 +348,9 @@ label.boton { cursor: pointer; }
   z-index: 2;
   display: flex;
   align-items: center;
-  gap: .5rem;
-  padding: .5rem .75rem;
-  padding-top: max(.5rem, env(safe-area-inset-top));
+  gap: .4rem;
+  padding: .4rem .6rem;
+  padding-top: max(.4rem, env(safe-area-inset-top));
   background: var(--fondo);
   border-bottom: 1px solid var(--linea);
 }
@@ -333,10 +369,15 @@ label.boton { cursor: pointer; }
   text-overflow: ellipsis;
 }
 
-main.lectura { padding-bottom: 9rem; }
+.cabeza #b-notas { font-size: .88rem; padding: .4rem .8rem; }
+
+main.lectura { padding-bottom: 13rem; }
 
 .texto {
-  font: 1.15rem/1.65 Georgia, "Times New Roman", serif;
+  font-family: var(--fuente);
+  font-size: var(--letra);
+  line-height: var(--interlinea);
+  text-align: var(--alinea);
   hyphens: auto;
   -webkit-tap-highlight-color: transparent;
 }
@@ -344,15 +385,17 @@ main.lectura { padding-bottom: 9rem; }
 .texto p { margin: 0 0 .9em; cursor: pointer; }
 
 .texto h2, .texto h3, .texto h4 {
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: var(--fuente);
   line-height: 1.3;
   margin: 1.6em 0 .7em;
+  text-align: left;
+  hyphens: manual;
   cursor: pointer;
 }
 
-.texto h2 { font-size: 1.45rem; text-align: center; }
-.texto h3 { font-size: 1.25rem; }
-.texto h4 { font-size: 1.1rem; }
+.texto h2 { font-size: 1.4em; text-align: center; }
+.texto h3 { font-size: 1.2em; }
+.texto h4 { font-size: 1.05em; }
 
 /* Las notas al pie, detrás del párrafo que las llama: más pequeñas y al
  * margen, como en el libro. Sólo se ven cuando se leen. */
@@ -363,6 +406,7 @@ main.lectura { padding-bottom: 9rem; }
   margin: -.4em 0 .9em .9em;
   padding-left: .7em;
   border-left: 2px solid var(--linea);
+  text-indent: 0;
 }
 
 .cabeza .boton[aria-pressed="true"] {
@@ -393,6 +437,131 @@ button.tramo {
   color: var(--acento);
 }
 
+/* ------------------------------------------------------ las páginas
+ * El tramo se pinta en columnas tan altas como la hoja y tan anchas como
+ * ella (dos, si la pantalla es ancha: el libro abierto), y pasar de página
+ * es correr las columnas de lado. Las medidas las pone app.js. */
+
+body.paginas { overflow: hidden; overscroll-behavior: none; }
+
+body.paginas #vista {
+  height: 100vh;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+body.paginas .cabeza { position: relative; flex: none; }
+body.paginas .cabeza #capitulo { display: none; }
+
+body.paginas main.lectura {
+  flex: 1;
+  min-height: 0;
+  max-width: none;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.cornisa, .folio { display: none; }
+
+body.paginas .cornisa, body.paginas .folio {
+  display: block;
+  flex: none;
+  width: 100%;
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: .6rem var(--margen) .2rem;
+  color: var(--tenue);
+  font-size: .76rem;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body.paginas .cornisa { font-variant: small-caps; letter-spacing: .05em; }
+body.paginas .folio {
+  padding: .2rem var(--margen) .6rem;
+  font-variant-numeric: tabular-nums;
+}
+body.inmersivo .cornisa { padding-top: max(.6rem, env(safe-area-inset-top)); }
+body.inmersivo .folio { padding-bottom: max(.6rem, env(safe-area-inset-bottom)); }
+
+#hoja { position: relative; }
+
+body.paginas #hoja {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: .3rem var(--margen) 0;
+  overflow: hidden;
+  touch-action: pan-y pinch-zoom;
+}
+
+/* el libro abierto, a dos páginas, si cabe */
+@media (min-width: 64rem) and (min-aspect-ratio: 5/4) {
+  body.paginas #hoja, body.paginas .cornisa, body.paginas .folio { max-width: 84rem; }
+}
+
+body.paginas .texto {
+  column-fill: auto;
+  transition: transform .3s cubic-bezier(.2, .7, .3, 1);
+}
+
+body.paginas .texto p { margin: 0 0 .4em; text-indent: 1.3em; }
+body.paginas .texto :is(h2, h3, h4) + p, body.paginas .texto > p:first-child { text-indent: 0; }
+body.paginas .texto :is(h2, h3, h4) { break-after: avoid; break-inside: avoid; }
+body.paginas .texto > :is(h2, h3):first-child { margin-top: .3em; }
+/* el capítulo empieza en página nueva, como en el libro */
+body.paginas .texto p + h2, body.paginas .texto p + h3 { break-before: column; margin-top: .3em; }
+
+/* la letra capitular, al empezar un capítulo */
+body.paginas .texto p.capitular { text-indent: 0; }
+body.paginas .texto p.capitular::first-letter {
+  float: left;
+  font-size: 3.1em;
+  line-height: .8;
+  padding: .07em .08em 0 0;
+  color: var(--acento);
+}
+
+/* La primera vez: dónde tocar */
+.ayuda {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: grid;
+  grid-template-columns: 1fr 2fr 1fr;
+  background: var(--fondo);
+  font-size: .92rem;
+  line-height: 1.4;
+  text-align: center;
+  cursor: pointer;
+}
+.ayuda > div {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: .3rem;
+  padding: 1rem .4rem;
+  border: 1px dashed var(--linea);
+  color: var(--tinta);
+}
+.ayuda b { font-size: 1.7rem; color: var(--acento); }
+.ayuda .medio { gap: 1.2rem; }
+
+/* Sin cabecera ni mandos: sólo la página */
+body.inmersivo .cabeza, body.inmersivo .mandos { display: none; }
+
+/* ------------------------------------------------------- los mandos */
+
 .mandos {
   position: fixed;
   left: 0;
@@ -401,19 +570,39 @@ button.tramo {
   z-index: 2;
   background: var(--papel);
   border-top: 1px solid var(--linea);
-  padding: .4rem 1rem;
-  padding-bottom: max(.6rem, env(safe-area-inset-bottom));
+  padding: .3rem .8rem;
+  padding-bottom: max(.5rem, env(safe-area-inset-bottom));
   text-align: center;
 }
 
-.mandos p { margin: 0 0 .3rem; min-height: 1.2em; font-size: .88rem; }
-.mandos p:empty { display: none; }
+body.paginas .mandos { position: relative; flex: none; }
+
+/* el aviso flota encima de los mandos: así no mueve la página */
+.mandos #voz-aviso {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + .6rem);
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100vw - 2rem);
+  margin: 0;
+  padding: .45rem .9rem;
+  border-radius: 12px;
+  background: var(--papel);
+  border: 1px solid var(--linea);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, .15);
+  font-size: .86rem;
+  pointer-events: none;
+}
+.mandos #voz-aviso:empty { display: none; }
 
 .mandos .fila {
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 1.5rem;
+  gap: 1rem;
+  max-width: 26rem;
+  margin: 0 auto;
 }
 
 .mandos button {
@@ -423,10 +612,27 @@ button.tramo {
   font-size: 1.2rem;
 }
 
-.mandos .velocidad { gap: .8rem; margin-top: .2rem; }
+.mandos .fila .lado {
+  min-width: 48px;
+  min-height: 48px;
+  padding: .3rem .5rem;
+  border-color: transparent;
+  background: none;
+  color: var(--tenue);
+  font-size: 1.15rem;
+}
+.mandos .fila .lado:first-child { margin-right: auto; }
+.mandos .fila .lado:last-child { margin-left: auto; font-family: Georgia, serif; }
+.mandos #b-sueno.activo {
+  color: var(--acento);
+  font-size: .9rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.mandos .velocidad { gap: .8rem; margin-top: .1rem; }
 .mandos .velocidad button {
   min-width: 44px;
-  min-height: 40px;
+  min-height: 38px;
   font-size: 1.3rem;
 }
 .mandos #vel {
@@ -435,18 +641,186 @@ button.tramo {
 }
 
 .mandos button.grande {
-  min-width: 64px;
-  min-height: 64px;
+  min-width: 62px;
+  min-height: 62px;
   font-size: 1.5rem;
 }
+
+/* La cinta del avance: todo el libro, y dónde se está */
+.avance {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  max-width: 34rem;
+  margin: 0 auto;
+  font-size: .75rem;
+  color: var(--tenue);
+  font-variant-numeric: tabular-nums;
+}
+.avance input {
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  margin: 0;
+  accent-color: var(--acento);
+  cursor: pointer;
+}
+.avance span { min-width: 2.8em; text-align: left; }
+.avance span:last-child { text-align: right; }
 
 button.flota {
   position: fixed;
   left: 50%;
   transform: translateX(-50%);
-  bottom: 10rem;
+  bottom: 13rem;
   z-index: 3;
   box-shadow: var(--sombra);
+}
+
+/* ---------------------------------------------------- el panel Aa */
+
+dialog.hoja.ligera::backdrop { background: rgba(20, 15, 10, .12); }
+
+.aspecto { overflow-y: auto; padding: .3rem 1.1rem 1.2rem; }
+
+.aspecto .opcion {
+  display: grid;
+  grid-template-columns: 4.8rem 1fr;
+  align-items: center;
+  gap: .6rem;
+  padding: .4rem 0;
+}
+.aspecto .opcion > span { color: var(--tenue); font-size: .9rem; }
+
+.segmentos {
+  display: flex;
+  border: 1px solid var(--linea);
+  border-radius: 999px;
+  padding: 3px;
+  gap: 2px;
+}
+.segmentos button {
+  flex: 1;
+  min-height: 38px;
+  padding: .3rem .4rem;
+  border: 0;
+  background: none;
+  font-weight: 500;
+  font-size: .9rem;
+  justify-content: center;
+}
+.segmentos button[aria-pressed="true"] {
+  background: var(--acento);
+  color: var(--papel);
+}
+
+.temas { display: flex; gap: .35rem; flex-wrap: wrap; }
+.temas button {
+  width: 42px;
+  min-width: 42px;
+  min-height: 42px;
+  padding: 0;
+  justify-content: center;
+  font: 600 1rem Georgia, serif;
+  border: 2px solid var(--linea);
+}
+.temas button[aria-pressed="true"] { border-color: var(--acento); box-shadow: 0 0 0 3px var(--acento-suave); }
+.temas .t-auto { background: linear-gradient(135deg, #fffdf9 50%, #211e1b 50%); color: #8a3b12; }
+.temas .t-claro { background: #fffdf9; color: #24211d; }
+.temas .t-sepia { background: #f3e9d2; color: #3d3022; }
+.temas .t-oscuro { background: #211e1b; color: #ece6dc; }
+.temas .t-noche { background: #000; color: #bdb5a9; }
+
+.tamano { display: flex; align-items: center; gap: .6rem; }
+.tamano button { min-width: 52px; justify-content: center; font-family: Georgia, serif; }
+.tamano #da-menos { font-size: .85rem; }
+.tamano #da-mas { font-size: 1.25rem; }
+.tamano span { flex: 1; text-align: center; font-variant-numeric: tabular-nums; }
+
+.aspecto .muestra {
+  margin: .3rem 0 .6rem;
+  padding: .6rem .9rem;
+  border-radius: 10px;
+  background: var(--fondo);
+  border: 1px solid var(--linea);
+  font-family: var(--fuente);
+  font-size: var(--letra);
+  line-height: var(--interlinea);
+  text-align: var(--alinea);
+  hyphens: auto;
+}
+
+.aspecto > .botones { justify-content: center; }
+
+/* El temporizador */
+
+.lista-sueno { list-style: none; margin: 0; padding: .3rem .6rem 1rem; overflow-y: auto; }
+.lista-sueno button {
+  width: 100%;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  font-weight: 500;
+  justify-content: flex-start;
+}
+.lista-sueno button[aria-pressed="true"] { background: var(--acento-suave); font-weight: 600; }
+
+/* La biblioteca: el libro que se está leyendo, en grande */
+
+.seguir {
+  display: flex;
+  gap: 1rem;
+  align-items: stretch;
+  background: var(--papel);
+  border: 1px solid var(--linea);
+  border-radius: 18px;
+  padding: 1rem;
+  margin: 1rem 0 1.4rem;
+  box-shadow: var(--sombra);
+  color: inherit;
+  text-decoration: none;
+}
+.seguir .tapa {
+  width: 92px;
+  height: 134px;
+  border-radius: 8px;
+  font-size: 2.4rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .18);
+}
+.seguir .datos { flex: 1; gap: .15rem; }
+.seguir .rotulo {
+  font-size: .75rem;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--acento);
+  font-weight: 600;
+}
+.seguir b { font: 600 1.15rem/1.25 Georgia, "Noto Serif", serif; }
+.seguir .donde {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.seguir .boton {
+  display: inline-flex;
+  align-items: center;
+  margin-top: auto;
+  align-self: flex-start;
+  min-height: 40px;
+  padding: .4rem 1.1rem;
+  border-radius: 999px;
+  background: var(--acento);
+  color: var(--papel);
+  font-weight: 600;
+}
+
+.biblio-titulo {
+  font-size: .8rem;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--tenue);
+  margin: 1.2rem 0 0;
 }
 
 /* Los diálogos */

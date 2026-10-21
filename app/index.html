@@ -40,7 +40,68 @@
   <nav id="indice-lista" class="indice"></nav>
 </dialog>
 
-<dialog id="d-voz" aria-labelledby="dv-titulo">
+<dialog id="d-aspecto" class="hoja ligera" aria-labelledby="da-titulo">
+  <div class="hoja-cabeza">
+    <h2 id="da-titulo">Aspecto</h2>
+    <form method="dialog"><button class="icono" aria-label="Cerrar">×</button></form>
+  </div>
+  <div class="aspecto">
+    <p class="muestra" lang="es">En un lugar de la Mancha, de cuyo nombre no quiero
+      acordarme, no ha mucho tiempo que vivía un hidalgo.</p>
+    <div class="opcion"><span>Leer</span>
+      <div class="segmentos" data-ajuste="modo">
+        <button type="button" data-v="paginas">Por páginas</button>
+        <button type="button" data-v="continuo">De corrido</button>
+      </div></div>
+    <div class="opcion"><span>Tema</span>
+      <div class="temas" data-ajuste="tema">
+        <button type="button" data-v="auto" class="t-auto" title="Como el teléfono" aria-label="Como el teléfono">Aa</button>
+        <button type="button" data-v="claro" class="t-claro" title="Claro" aria-label="Claro">Aa</button>
+        <button type="button" data-v="sepia" class="t-sepia" title="Sepia" aria-label="Sepia">Aa</button>
+        <button type="button" data-v="oscuro" class="t-oscuro" title="Oscuro" aria-label="Oscuro">Aa</button>
+        <button type="button" data-v="noche" class="t-noche" title="Noche" aria-label="Noche">Aa</button>
+      </div></div>
+    <div class="opcion"><span>Letra</span>
+      <div class="tamano">
+        <button type="button" id="da-menos" aria-label="Letra más pequeña">A−</button>
+        <span id="da-letra"></span>
+        <button type="button" id="da-mas" aria-label="Letra más grande">A+</button>
+      </div></div>
+    <div class="opcion"><span>Tipo</span>
+      <div class="segmentos" data-ajuste="fuente">
+        <button type="button" data-v="serif" style="font-family: Georgia, 'Noto Serif', serif">Con serifa</button>
+        <button type="button" data-v="sans" style="font-family: system-ui, Roboto, sans-serif">Sin serifa</button>
+      </div></div>
+    <div class="opcion"><span>Renglones</span>
+      <div class="segmentos" data-ajuste="interlinea">
+        <button type="button" data-v="junta">Juntos</button>
+        <button type="button" data-v="normal">Normal</button>
+        <button type="button" data-v="amplia">Amplios</button>
+      </div></div>
+    <div class="opcion"><span>Márgenes</span>
+      <div class="segmentos" data-ajuste="margen">
+        <button type="button" data-v="estrecho">Estrechos</button>
+        <button type="button" data-v="normal">Normales</button>
+        <button type="button" data-v="ancho">Anchos</button>
+      </div></div>
+    <div class="opcion"><span>Alinear</span>
+      <div class="segmentos" data-ajuste="justifica">
+        <button type="button" data-v="si">Justificado</button>
+        <button type="button" data-v="no">A la izquierda</button>
+      </div></div>
+    <div class="botones"><button type="button" id="da-completa">⤢ Sólo la página</button></div>
+  </div>
+</dialog>
+
+<dialog id="d-sueno" class="hoja ligera" aria-labelledby="ds-titulo">
+  <div class="hoja-cabeza">
+    <h2 id="ds-titulo">Apagar la voz</h2>
+    <form method="dialog"><button class="icono" aria-label="Cerrar">×</button></form>
+  </div>
+  <ul class="lista-sueno" id="sueno-lista"></ul>
+</dialog>
+
+<dialog id="d-voz"aria-labelledby="dv-titulo">
   <h2 id="dv-titulo">Falta la voz</h2>
   <p>Para oír este libro hace falta bajar la voz <b id="dv-nombre"></b>.</p>
   <p class="nota" id="dv-estado"></p>

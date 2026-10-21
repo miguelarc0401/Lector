@@ -211,6 +211,25 @@ con adelantar cuarenta trozos; un libro se escucha horas. Lo que se hace:
 - Mandos del volante y de los auriculares (MediaSession).
 - Marcadores.
 
+**Leer como un libro (21-10-2026).** Además de oír, se lee:
+
+- **Por páginas** (lo de siempre al abrir) o **de corrido** (desplazando,
+  como antes): botón **Aa**. Por páginas, el tramo se pone en columnas del
+  tamaño de la hoja y pasar de página es correrlas de lado; en una pantalla
+  ancha, dos páginas, como el libro abierto. Se pasa tocando los lados,
+  deslizando el dedo, con la rueda o con las flechas; tocar una frase en medio
+  sigue leyéndola en voz alta. Con la voz, la página pasa sola.
+- Arriba, el capítulo; abajo, la página impresa y lo que queda del capítulo a
+  la velocidad de la voz. Tocarlos deja **sólo la página** (y otra vez, los
+  mandos). Cada capítulo empieza en página nueva, con letra capitular.
+- **Aa**: tema (como el teléfono, claro, sepia, oscuro, noche), tamaño de la
+  letra, con o sin serifa, renglones, márgenes, justificado. Vale para todos
+  los libros. La posición guarda la letra con que empieza la página: al
+  volver, o al girar el teléfono o cambiar la letra, sigue en la misma.
+- **Cinta del avance** por todo el libro, **temporizador** (10 a 90 min, o al
+  acabar el capítulo: se apaga al empezar la frase siguiente) y, en la
+  biblioteca, el último libro en grande para seguir con un toque.
+
 ---
 
 ## 3. Fases
@@ -271,6 +290,7 @@ Cómo quedó:
 
 - [ ] El adelanto en memoria ajustado a lo que midió la Fase 0.
 - [ ] Mandos por MediaSession, velocidad, temporizador de apagado.
+      *(Velocidad y temporizador, hechos.)*
 - [ ] Si el teléfono la corta, al volver sigue por donde iba.
 
 **Listo cuando:** una hora seguida con la pantalla apagada, sin cortes, y al
