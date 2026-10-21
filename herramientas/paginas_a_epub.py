@@ -7,9 +7,11 @@ orden del PDF) con esta forma:
     +palabras que siguen      la página empieza a media frase: va pegado al
                               párrafo de la página de antes (y «Mu-» + «chos»
                               se une en «Muchos»)
-    # Parte I. …              títulos: # parte, ## capítulo, ### sección
-    {1. Título.}—Texto…       epígrafe numerado dentro de una sección: sale
-                              como título pequeño (h4) y el texto aparte
+    # Parte I. …              títulos: # parte, ## capítulo, ### sección,
+                              #### apartado de una sección
+    {1. Título.}—Texto…       epígrafe numerado dentro de una sección (o de
+                              su apartado): sale como título pequeño y el
+                              texto aparte
     Texto con nota[^5].       llamada a la nota 5 (o [^*], [^102*])
     _cursiva_  **negrita**
 
@@ -19,13 +21,23 @@ orden del PDF) con esta forma:
     Un renglón sin [..] es otro párrafo de la nota de arriba.
 
 Los párrafos van separados por un renglón en blanco. Las notas se numeran
-por capítulo, como en el libro: la llamada [^5] de un capítulo se empareja
-con la nota [5] que viene después de ella.
+como en el libro, por capítulo o por página: la llamada [^5] se empareja
+con la primera nota [5] que viene después de ella y no tiene dueña.
 
 En el EPUB, cada capítulo es un archivo; cada nota es un <aside
 epub:type="footnote"> al final de su capítulo, y la llamada, un <a
 epub:type="noteref">. Así cualquier lector de EPUB la enseña como nota, y
 Lector sabe leerla o callarla.
+
+Los datos del libro (título, autores…) van en `ficha.txt`, junto a la
+carpeta de las páginas, renglón por renglón:
+
+    titulo: La evolución homogénea del dogma católico
+    autor: Francisco Marín-Sola, O.P.        (uno por renglón, los que haya)
+    editorial: Biblioteca de Autores Cristianos
+    lengua: es
+
+Si no hay ficha, son los de la Historia de la Iglesia III.
 
 Uso:
     python paginas_a_epub.py CARPETA_DE_PAGINAS SALIDA.epub [--portada X.jpg]
@@ -44,9 +56,30 @@ AUTORES = ['Ricardo García-Villoslada, S.I.', 'Bernardino Llorca, S.I.']
 EDITORIAL = 'Biblioteca de Autores Cristianos'
 LENGUA = 'es'
 
+
+def ficha(carpeta):
+    """Lee `ficha.txt` (junto a la carpeta de las páginas), si la hay."""
+    global TITULO, AUTORES, EDITORIAL, LENGUA
+    f = Path(carpeta).resolve().parent / 'ficha.txt'
+    if not f.exists():
+        return
+    autores = []
+    for r in f.read_text(encoding='utf-8').splitlines():
+        clave, _, valor = r.partition(':')
+        clave, valor = clave.strip().lower(), valor.strip()
+        if clave == 'titulo':
+            TITULO = valor
+        elif clave == 'autor':
+            autores.append(valor)
+        elif clave == 'editorial':
+            EDITORIAL = valor
+        elif clave == 'lengua':
+            LENGUA = valor
+    AUTORES = autores
+
 # ---------------------------------------------------------------- leer
 
-NIVEL = {'#': 1, '##': 2, '###': 3}
+NIVEL = {'#': 1, '##': 2, '###': 3, '####': 4}
 
 
 def pega(antes, despues):
@@ -60,6 +93,7 @@ def lee(carpeta):
     """Las páginas, en bloques: ('h', nivel, texto, pág) o ('p', texto, pág),
     y las notas en el orden en que aparecen: (id, [párrafos], pág)."""
     bloques, notas = [], []
+    apartado = False
     for f in sorted(Path(carpeta).glob('*.txt')):
         crudo = f.read_text(encoding='utf-8').replace('\r\n', '\n')
         cuerpo, _, pie = crudo.partition('\n====\n')
@@ -80,13 +114,15 @@ def lee(carpeta):
                 primero = False
                 continue
             primero = False
-            m = re.match(r'(#{1,3}) +(.*)', b)
+            m = re.match(r'(#{1,4}) +(.*)', b)
             if m:
                 bloques.append(('h', NIVEL[m.group(1)], m.group(2), pag))
+                apartado = len(m.group(1)) == 4
                 continue
             m = re.match(r'\{(.+?)\.?\}\s*—\s*(.*)', b)
             if m:
-                bloques.append(('h', 4, m.group(1), pag))
+                # el epígrafe va debajo del apartado (####) de su sección, si lo hay
+                bloques.append(('h', 5 if apartado else 4, m.group(1), pag))
                 if m.group(2):
                     bloques.append(('p', m.group(2), pag))
                 continue
@@ -122,17 +158,21 @@ def capitulos(bloques, notas):
         caps[-1]['bloques'].append(b)
 
     # cada llamada, con la primera nota de ese número que no tenga dueña
+    # (si las notas van por página, un número se repite en el capítulo:
+    # por eso cada llamada se apunta, por orden, con el lugar de su nota)
     libres = list(notas)
     for c in caps:
-        c['notas'] = []
+        c['notas'], c['llamadas'] = [], []
         for b in c['bloques']:
             for ref in re.findall(r'\[\^([^\]]+)\]', b[2] if b[0] == 'h' else b[1]):
                 k = next((i for i, x in enumerate(libres) if x[0] == ref), None)
                 if k is None:
-                    print('aviso: la llamada [^%s] del capítulo %d no tiene nota'
-                          % (ref, c['n']), file=sys.stderr)
+                    print('aviso: la llamada [^%s] del capítulo %d (pág. %s) no tiene nota'
+                          % (ref, c['n'], b[-1]), file=sys.stderr)
+                    c['llamadas'].append(None)
                     continue
                 c['notas'].append(libres.pop(k))
+                c['llamadas'].append(len(c['notas']))
     for x in libres:
         print('aviso: la nota [%s] (pág. %s) no tiene llamada' % (x[0], x[2]),
               file=sys.stderr)
@@ -141,20 +181,25 @@ def capitulos(bloques, notas):
 
 # ------------------------------------------------------------- a XHTML
 
-def nid(cap, ref):
-    return 'n%d-%s' % (cap, re.sub(r'\W', 'x', ref))
+def nid(cap, k):
+    return 'n%d-%d' % (cap, k)
 
 
-def enlinea(t, cap):
+def enlinea(t, cap, llamadas=None):
+    """Las marcas de un párrafo, a XHTML; `llamadas` da, por orden, el lugar
+    de la nota de cada llamada (None: no tiene nota)."""
     t = html.escape(t, quote=False)
     t = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', t)
     t = re.sub(r'(?<!\w)_(.+?)_(?!\w)', r'<i>\1</i>', t)
 
     def llamada(m):
-        ref = m.group(1)
-        i = nid(cap, ref)
+        ref = html.escape(m.group(1))
+        k = next(llamadas, None) if llamadas else None
+        if k is None:
+            return '<sup>%s</sup>' % ref
+        i = nid(cap, k)
         return ('<sup><a epub:type="noteref" role="doc-noteref" id="r%s" href="#%s">%s</a></sup>'
-                % (i, i, html.escape(ref)))
+                % (i, i, ref))
     return re.sub(r'\[\^([^\]]+)\]', llamada, t)
 
 
@@ -177,6 +222,7 @@ def capitulo_xhtml(c, archivo, toc):
     n = c['n']
     partes, k = [], 0
     pag_vista = None
+    llamadas = iter(c['llamadas'])
     for b in c['bloques']:
         pag = b[-1]
         if pag and pag != pag_vista:
@@ -186,15 +232,15 @@ def capitulo_xhtml(c, archivo, toc):
         if b[0] == 'h':
             k += 1
             hid = 't%d-%d' % (n, k)
-            partes.append('<h%d id="%s">%s</h%d>' % (b[1], hid, enlinea(b[2], n), b[1]))
+            partes.append('<h%d id="%s">%s</h%d>' % (b[1], hid, enlinea(b[2], n, llamadas), b[1]))
             toc.append((b[1], sinmarcas(b[2]), '%s#%s' % (archivo, hid)))
         else:
-            partes.append('<p>%s</p>' % enlinea(b[1], n))
+            partes.append('<p>%s</p>' % enlinea(b[1], n, llamadas))
     if c['notas']:
         partes.append('<section epub:type="footnotes" role="doc-endnotes" class="notas">')
         partes.append('<h2 class="notas-titulo">Notas</h2>')
-        for ref, pars, _ in c['notas']:
-            i = nid(n, ref)
+        for j, (ref, pars, _) in enumerate(c['notas'], 1):
+            i = nid(n, j)
             cuerpo = ''.join('<p>%s%s</p>' % (
                 ('<a href="#r%s" class="vuelta">%s</a> ' % (i, html.escape(ref))) if j == 0 else '',
                 enlinea(p, n)) for j, p in enumerate(pars))
@@ -231,7 +277,7 @@ def nav_xhtml(toc):
 
 ESTILO = """body { font-family: serif; line-height: 1.45; margin: 0 4%; }
 h1, h2 { text-align: center; }
-h4 { font-size: 1em; margin: 1.2em 0 .3em; }
+h4, h5 { font-size: 1em; margin: 1.2em 0 .3em; }
 p { text-indent: 1.2em; margin: 0 0 .4em; text-align: justify; }
 sup a { text-decoration: none; font-size: .75em; }
 .notas { margin-top: 2em; border-top: 1px solid #999; font-size: .85em; }
@@ -296,6 +342,7 @@ def main():
     ap.add_argument('salida')
     ap.add_argument('--portada')
     a = ap.parse_args()
+    ficha(a.paginas)
     bloques, notas = lee(a.paginas)
     caps = capitulos(bloques, notas)
     toc = escribe(caps, a.salida, a.portada)
