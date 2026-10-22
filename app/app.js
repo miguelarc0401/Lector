@@ -830,32 +830,41 @@
     return r ? paginaDeX(r.left) : 0;
   }
 
-  /** La primera letra de la página `n`: { p, c }. Si la página empieza a
-   *  media frase, se busca la letra a saltos (como en un diccionario). */
+  /** La primera letra de la página `n`: { p, c }. El párrafo, y si la
+   *  página empieza a media frase la letra, se buscan a saltos (como en un
+   *  diccionario): mirarlos uno a uno, hacia el final de un tramo largo,
+   *  frenaba el paso de página. */
   function anclaDe(n) {
     const art = $('#texto');
     if (!art) return null;
-    for (const el of art.children) {
-      if (el.hidden || el.dataset.i === undefined) continue;
-      const rs = el.getClientRects();
-      if (!rs.length || paginaDeX(rs[rs.length - 1].left) < n) continue;
-      const p = +el.dataset.i;
-      const t = el.firstChild;
-      if (paginaDeX(rs[0].left) >= n || !t || t.nodeType !== 3) return { p: p, c: 0 };
-      let lo = 0;
-      let hi = t.length - 1;
-      const g = document.createRange();
-      while (lo < hi) {
-        const m = (lo + hi) >> 1;
-        g.setStart(t, m);
-        g.setEnd(t, m + 1);
-        const r = g.getClientRects()[0];
-        if (!r || paginaDeX(r.left) < n) lo = m + 1;
-        else hi = m;
-      }
-      return { p: p, c: lo };
+    // el primer párrafo que acaba en la página `n` o más allá
+    const els = art.querySelectorAll('[data-i]:not([hidden])');
+    let a = 0;
+    let b = els.length;
+    while (a < b) {
+      const m = (a + b) >> 1;
+      const rs = els[m].getClientRects();
+      if (!rs.length || paginaDeX(rs[rs.length - 1].left) < n) a = m + 1;
+      else b = m;
     }
-    return null;
+    const el = els[a];
+    const rs = el && el.getClientRects();
+    if (!rs || !rs.length) return null;
+    const p = +el.dataset.i;
+    const t = el.firstChild;
+    if (paginaDeX(rs[0].left) >= n || !t || t.nodeType !== 3) return { p: p, c: 0 };
+    let lo = 0;
+    let hi = t.length - 1;
+    const g = document.createRange();
+    while (lo < hi) {
+      const m = (lo + hi) >> 1;
+      g.setStart(t, m);
+      g.setEnd(t, m + 1);
+      const r = g.getClientRects()[0];
+      if (!r || paginaDeX(r.left) < n) lo = m + 1;
+      else hi = m;
+    }
+    return { p: p, c: lo };
   }
 
   /** Pasa una página adelante (+1) o atrás (-1); en el borde del tramo,

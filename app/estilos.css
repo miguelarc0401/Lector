@@ -510,9 +510,12 @@ body.paginas #hoja {
   body.paginas #hoja, body.paginas .cornisa, body.paginas .folio { max-width: 84rem; }
 }
 
+/* will-change: la tira de páginas va en su propia capa, y pasar de página
+ * (o arrastrarla con el dedo) es sólo moverla, sin volver a pintar la letra */
 body.paginas .texto {
   column-fill: auto;
   transition: transform .3s cubic-bezier(.2, .7, .3, 1);
+  will-change: transform;
 }
 
 body.paginas .texto p { margin: 0 0 .4em; text-indent: 1.3em; }
