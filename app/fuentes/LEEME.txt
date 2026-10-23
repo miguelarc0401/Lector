@@ -1,0 +1,12 @@
+Las letras de Lector, dentro de la app para que se vean igual sin conexión
+y en cualquier teléfono (sólo el alfabeto latino: lo demás lo pone el
+sistema).
+
+  literata.woff2            Literata (TypeTogether para Google), la del texto
+                            del libro. Variable: pesos 300 a 700.
+  cormorant-garamond.woff2  Cormorant Garamond (Christian Thalmann), la de los
+                            títulos y las tapas. Variable: pesos 400 a 700.
+
+Las dos son libres, con la licencia SIL Open Font License 1.1
+(https://openfontlicense.org): se pueden usar, copiar y repartir con la app.
+Bajadas de Google Fonts el 23 de octubre de 2026.

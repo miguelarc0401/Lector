@@ -33,6 +33,8 @@ const FICHEROS = [
   'version.js',
   'manifest.webmanifest',
   'icono.svg',
+  'fuentes/literata.woff2',
+  'fuentes/cormorant-garamond.woff2',
   'icono-32.png',
   'icono-180.png',
   'icono-192.png'

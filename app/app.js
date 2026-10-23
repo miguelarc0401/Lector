@@ -21,6 +21,61 @@
     '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
   const mb = (b) => Math.round(b / 1048576) + ' MB';
 
+  /* Los iconos: trazos de 24×24 del color del texto (.ico en estilos.css),
+   * y no letras como ⏮ o ☾, que en Android salen como emoji. */
+  const ICONOS = {
+    atras: '<path d="M19 12H5M11 18l-6-6 6-6"/>',
+    adelante: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+    izquierda: '<path d="M15 18l-6-6 6-6"/>',
+    derecha: '<path d="M9 18l6-6-6-6"/>',
+    indice: '<path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01"/>',
+    ajustes: '<path d="M3 6h11M18 6h3M3 12h3M10 12h11M3 18h13M20 18h1"/>'
+      + '<circle cx="16" cy="6" r="2"/><circle cx="8" cy="12" r="2"/><circle cx="18" cy="18" r="2"/>',
+    mas: '<path d="M12 5v14M5 12h14"/>',
+    menos: '<path d="M5 12h14"/>',
+    quita: '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/>',
+    nube: '<path d="M17.5 19H8a6 6 0 1 1 5.7-7.9h1.3a4 4 0 0 1 2.5 7.9z"/>',
+    refresca: '<path d="M20 12a8 8 0 1 1-2.4-5.7L20 8.6"/><path d="M20 3.5v5.1h-5.1"/>',
+    play: '<path class="lleno" d="M8 5.3v13.4a1 1 0 0 0 1.5.86l10.6-6.7a1 1 0 0 0 0-1.72L9.5 4.44A1 1 0 0 0 8 5.3z"/>',
+    pausa: '<rect class="lleno" x="6" y="4.5" width="4.4" height="15" rx="1.3"/>'
+      + '<rect class="lleno" x="13.6" y="4.5" width="4.4" height="15" rx="1.3"/>',
+    anterior: '<path class="lleno" d="M18.5 6.2v11.6a.8.8 0 0 1-1.25.66L9.6 12.66a.8.8 0 0 1 0-1.32l7.65-5.8a.8.8 0 0 1 1.25.66z"/>'
+      + '<path d="M6 6v12"/>',
+    siguiente: '<path class="lleno" d="M5.5 6.2v11.6a.8.8 0 0 0 1.25.66l7.65-5.8a.8.8 0 0 0 0-1.32L6.75 5.54A.8.8 0 0 0 5.5 6.2z"/>'
+      + '<path d="M18 6v12"/>',
+    luna: '<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>',
+    notas: '<path d="M4 7h9M4 12h9M4 17h6"/><path d="M18 4v6M15.4 5.5l5.2 3M20.6 5.5l-5.2 3"/>',
+    libro: '<path d="M2 5.5A1.5 1.5 0 0 1 3.5 4H9a3 3 0 0 1 3 3v13a2.5 2.5 0 0 0-2.5-2.5H2z"/>'
+      + '<path d="M22 5.5A1.5 1.5 0 0 0 20.5 4H15a3 3 0 0 0-3 3v13a2.5 2.5 0 0 1 2.5-2.5H22z"/>',
+    sigue: '<circle cx="12" cy="12" r="7"/><circle class="lleno" cx="12" cy="12" r="2.5"/>'
+      + '<path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>',
+    descarga: '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>',
+    hecho: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+    velocidad: '<path d="M12 14l4.5-4.5"/><path d="M3.6 18a9 9 0 1 1 16.8 0"/>',
+    tema: '<circle cx="12" cy="12" r="9"/><path class="lleno" d="M12 3a9 9 0 0 1 0 18z"/>',
+    disco: '<ellipse cx="12" cy="5.5" rx="8" ry="3"/><path d="M4 5.5v13c0 1.7 3.6 3 8 3s8-1.3 8-3v-13"/>'
+      + '<path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/>',
+    onda: '<path d="M4 10v4M8 7v10M12 4v16M16 8v8M20 11v2"/>',
+    toca: '<path d="M9 11V5.5a1.5 1.5 0 0 1 3 0V11m0-1.5a1.5 1.5 0 0 1 3 0V11m0-.5a1.5 1.5 0 0 1 3 0V15a6 6 0 0 1-6 6h-.8'
+      + 'a6 6 0 0 1-4.6-2.2L4.3 15.6a1.6 1.6 0 0 1 2.4-2.1L9 15.5"/>'
+  };
+  const ico = (n) => '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false">'
+    + ICONOS[n] + '</svg>';
+
+  /* El sello de la app (el icono) y las telas de las tapas que se hacen
+   * para los libros que no traen portada: el color sale del título, así un
+   * libro tiene siempre la misma. */
+  const SELLO = '<svg class="sello" viewBox="0 0 64 64" aria-hidden="true" focusable="false">'
+    + '<rect width="64" height="64" rx="14" fill="#8a3b12"/>'
+    + '<path d="M14 18c6-2 12-1 16 3v27c-4-4-10-5-16-3z" fill="#fffdf9"/>'
+    + '<path d="M50 18c-6-2-12-1-16 3v27c4-4 10-5 16-3z" fill="#f3e3d6"/>'
+    + '<path d="M41 28a5 5 0 0 1 0 8M45 25a9 9 0 0 1 0 14" fill="none" stroke="#8a3b12" '
+    + 'stroke-width="2.4" stroke-linecap="round"/></svg>';
+  const TELAS = [['#6e2318', '#e0b66c'], ['#1f3350', '#d8b673'], ['#24402f', '#d3b26e'],
+    ['#4a2340', '#dcb877'], ['#5b3a17', '#e6c78a'], ['#2f3b40', '#cfae70'], ['#1d4a4a', '#d9ba7b']];
+  const telaDe = (t) => TELAS[Array.from(String(t || '')).reduce((h, c) =>
+    (h * 31 + c.charCodeAt(0)) >>> 0, 7) % TELAS.length];
+
   /* Un tramo no pasa de estos párrafos: si un capítulo es más largo, se
    * parte por sus secciones, y si no las tiene, a pedazos de esta medida. */
   const TRAMO = 500;
@@ -62,6 +117,7 @@
     if (t) t.textContent = velTexto(v);
     if ($('#b-lento')) $('#b-lento').disabled = v <= VELS[0];
     if ($('#b-rapido')) $('#b-rapido').disabled = v >= VELS[VELS.length - 1];
+    if ($('#a-vel')) $('#a-vel').value = v;
   }
 
   function guardaAjustes() {
@@ -71,9 +127,20 @@
   /* El aspecto: el tema vale para toda la app; la letra, los renglones y
    * los márgenes, para el texto del libro (variables de estilos.css). */
   const FUENTES = {
-    serif: 'Georgia, "Noto Serif", "Times New Roman", serif',
+    serif: '"Literata", Georgia, "Noto Serif", "Times New Roman", serif',
     sans: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif'
   };
+  // la de los títulos del libro y la letra capitular: con serifa, la de las
+  // tapas; sin ella, la misma del texto
+  const TITULOS = '"Cormorant Garamond", "Literata", Georgia, serif';
+  const TEMAS = [['auto', 'Auto', 'Como el teléfono (claro u oscuro)'], ['claro', 'Claro'],
+    ['sepia', 'Sepia'], ['oscuro', 'Oscuro'], ['noche', 'Noche', 'Negro, para leer a oscuras']];
+
+  /** Las muestras de los temas, para el panel Aa y para Ajustes. */
+  const botonesTema = () => TEMAS.map((t) => '<button type="button" data-v="' + t[0]
+    + '" class="t-' + t[0] + '" title="' + esc(t[2] || t[1]) + '">'
+    + '<span class="circulo" aria-hidden="true">Aa</span><small>' + t[1] + '</small></button>').join('');
+  $('#d-aspecto .temas').innerHTML = botonesTema();
   const INTERLINEAS = { junta: 1.45, normal: 1.65, amplia: 1.9 };
   const MARGENES = { estrecho: '.9rem', normal: '1.4rem', ancho: '2.6rem' };
   const LETRAS = [80, 90, 100, 110, 120, 135, 150, 170, 190];
@@ -84,10 +151,17 @@
     else delete r.dataset.tema;
     const l = A.lec;
     r.style.setProperty('--fuente', FUENTES[l.fuente] || FUENTES.serif);
+    r.style.setProperty('--fuente-titulo', l.fuente === 'sans' ? FUENTES.sans : TITULOS);
     r.style.setProperty('--letra', (1.15 * (l.letra || 100) / 100).toFixed(3) + 'rem');
     r.style.setProperty('--interlinea', INTERLINEAS[l.interlinea] || INTERLINEAS.normal);
     r.style.setProperty('--margen', MARGENES[l.margen] || MARGENES.normal);
     r.style.setProperty('--alinea', l.justifica === 'no' ? 'left' : 'justify');
+    colorBarra();
+  }
+
+  /** La barra del teléfono, del color de lo de arriba: el papel del libro
+   *  leyendo, el fondo en lo demás. */
+  function colorBarra() {
     const m = document.querySelector('meta[name="theme-color"]');
     if (m) m.content = getComputedStyle(document.body).backgroundColor || '#8a3b12';
   }
@@ -287,6 +361,7 @@
     L.tramo = -1;
     document.body.dataset.vista = r.vista;
     document.body.classList.remove('paginas', 'inmersivo');
+    colorBarra();
     if (L.ro) { L.ro.disconnect(); L.ro = null; }
     document.querySelectorAll('dialog[open]').forEach((d) => d.close());
     if (window.CSS && CSS.highlights) CSS.highlights.delete('suena');
@@ -311,61 +386,83 @@
     const libros = await Biblioteca.libros();
     const est = Voz.estado().estado;
     const suena = L.sonando && est !== 'parada' ? L.sonando.libro.id : null;
-    const tapaDe = (l) => {
-      if (!l.portada) return '<span>' + esc((l.titulo || '?').trim().slice(0, 1).toUpperCase()) + '</span>';
-      const u = URL.createObjectURL(l.portada);
-      L.urls.push(u);
-      return '<img src="' + u + '" alt="">';
+    /** La tapa: la portada del libro, o una de tela con su título en oro. */
+    const tapaDe = (l, chapa) => {
+      if (l.portada) {
+        const u = URL.createObjectURL(l.portada);
+        L.urls.push(u);
+        return '<div class="tapa"><img src="' + u + '" alt="">' + (chapa || '') + '</div>';
+      }
+      const t = telaDe(l.titulo);
+      return '<div class="tapa hecha" style="--tela:' + t[0] + ';--dorado:' + t[1] + '">'
+        + '<span class="t-titulo" aria-hidden="true">' + esc(l.titulo) + '</span>'
+        + '<span class="t-orla"></span>'
+        + (l.autor ? '<span class="t-autor" aria-hidden="true">' + esc(l.autor) + '</span>' : '')
+        + (chapa || '') + '</div>';
     };
-    const fichas = libros.map((l) => {
-      const tapa = tapaDe(l);
+    const ondas = '<span class="ondas" aria-hidden="true"><i></i><i></i><i></i></span>';
+    const enVoz = est === 'pausada' ? 'En pausa' : 'Sonando';
+    /** Por dónde va un libro: el tanto por ciento, la página y el capítulo. */
+    const donde = (l) => {
       const pos = (l.pos && l.pos.p) || 0;
-      const pct = l.n ? Math.round((100 * pos) / l.n) : 0;
-      const pag = pagina(l.paginas, pos, (l.pos && l.pos.c) || 0);
-      const e = entradaDe({ plano: aplanaIndice(l.indice || []) }, pos);
+      return { pos: pos, pct: l.n ? Math.round((100 * pos) / l.n) : 0,
+        pag: pagina(l.paginas, pos, (l.pos && l.pos.c) || 0),
+        e: entradaDe({ plano: aplanaIndice(l.indice || []) }, pos) };
+    };
+    const barra = (pct) => '<div class="barra" role="progressbar" aria-label="Leído" aria-valuemin="0" '
+      + 'aria-valuemax="100" aria-valuenow="' + pct + '"><div style="width:' + pct + '%"></div></div>';
+    const fichas = libros.map((l) => {
+      const d = donde(l);
+      const vivo = suena === l.id;
       return '<li class="ficha">'
-        + '<a class="libro" href="#/libro/' + encodeURIComponent(l.id) + '">'
-        + '<div class="tapa">' + tapa + '</div>'
-        + '<div class="datos"><b>' + esc(l.titulo) + '</b>'
-        + (l.autor ? '<span class="nota">' + esc(l.autor) + '</span>' : '')
-        + '<div class="barra"><div style="width:' + pct + '%"></div></div>'
-        + '<span class="nota">' + (suena === l.id ? '<span class="vivo">' + (est === 'pausada' ? 'En pausa' : 'Sonando') + '</span> · ' : '')
-        + pct + ' %' + (pag ? ' · ' + esc(pag) : '') + (e ? ' · ' + esc(e.t) : '') + '</span></div></a>'
-        + '<button type="button" class="quita" data-id="' + esc(l.id) + '" aria-label="Quitar «'
-        + esc(l.titulo) + '»">×</button></li>';
+        + '<a class="libro" href="#/libro/' + encodeURIComponent(l.id) + '" title="'
+        + esc([d.pct + ' %', d.pag, d.e ? d.e.t : ''].filter(Boolean).join(' · ')) + '">'
+        + tapaDe(l, vivo ? '<span class="chapa">' + ondas + enVoz + '</span>' : '')
+        + '<span class="ficha-titulo">' + esc(l.titulo) + '</span>'
+        + (l.autor ? '<span class="ficha-autor">' + esc(l.autor) + '</span>' : '')
+        + '</a><div class="ficha-pie">'
+        + (d.pos ? barra(d.pct) + '<span class="ficha-pct">' + d.pct + ' %</span>'
+          : '<span class="ficha-pct nuevo">Sin empezar</span>')
+        + '<button type="button" class="quita icono" data-id="' + esc(l.id) + '" aria-label="Quitar «'
+        + esc(l.titulo) + '»" title="Quitar">' + ico('quita') + '</button></div></li>';
     });
     // el último que se abrió, en grande, para seguir con un toque
     const ult = libros.find((l) => l.abierto);
     let seguir = '';
     if (ult) {
-      const pos = (ult.pos && ult.pos.p) || 0;
-      const pct = ult.n ? Math.round((100 * pos) / ult.n) : 0;
-      const pag = pagina(ult.paginas, pos, (ult.pos && ult.pos.c) || 0);
-      const e = entradaDe({ plano: aplanaIndice(ult.indice || []) }, pos);
+      const d = donde(ult);
+      const vivo = suena === ult.id;
       seguir = '<a class="seguir" href="#/libro/' + encodeURIComponent(ult.id) + '">'
-        + '<div class="tapa">' + tapaDe(ult) + '</div>'
-        + '<div class="datos"><span class="rotulo">'
-        + (suena === ult.id ? (est === 'pausada' ? 'En pausa' : 'Sonando') : 'Seguir leyendo') + '</span>'
+        + tapaDe(ult)
+        + '<div class="datos"><span class="rotulo">' + (vivo ? ondas + enVoz : 'Seguir leyendo') + '</span>'
         + '<b>' + esc(ult.titulo) + '</b>'
-        + (e ? '<span class="nota donde">' + esc(e.t) + '</span>' : '')
-        + '<div class="barra"><div style="width:' + pct + '%"></div></div>'
-        + '<span class="nota">' + pct + ' %' + (pag ? ' · ' + esc(pag) : '') + '</span>'
-        + '<span class="boton principal">▶ Seguir</span></div></a>';
+        + (ult.autor ? '<p class="nota autor">' + esc(ult.autor) + '</p>' : '')
+        + (d.e ? '<span class="donde">' + esc(d.e.t) + '</span>' : '')
+        + '<div class="pie">' + barra(d.pct) + '<span>' + d.pct + ' %'
+        + (d.pag ? ' · ' + esc(d.pag) : '') + '</span></div>'
+        + '<span class="boton principal">' + ico('play') + 'Seguir</span></div></a>';
     }
-    vista.innerHTML = '<main>'
-      + '<header class="portadilla"><div><h1>Lector</h1>'
-      + '<p class="sub">Libros en voz alta, sin conexión.</p></div>'
-      + '<a class="boton" href="#/ajustes">Ajustes</a></header>'
+    const h = new Date().getHours();
+    const saludo = h >= 6 && h < 13 ? 'Buenos días' : h >= 13 && h < 21 ? 'Buenas tardes' : 'Buenas noches';
+    const abrir = '<input type="file" id="archivo" hidden '
+      + 'accept=".epub,.txt,.md,application/epub+zip,text/plain,text/markdown">';
+    vista.innerHTML = '<main class="biblioteca">'
+      + '<header class="portadilla"><div class="marca">' + SELLO + '<div><h1>Lector</h1>'
+      + '<p class="sub">' + (libros.length ? saludo + '. ¿Qué leemos hoy?' : 'Libros en voz alta, sin conexión.')
+      + '</p></div></div>'
+      + '<a class="boton icono" href="#/ajustes" aria-label="Ajustes" title="Ajustes">' + ico('ajustes') + '</a></header>'
       + seguir
-      + '<div class="botones"><label class="boton' + (seguir ? '' : ' principal') + '">Abrir un libro'
-      + '<input type="file" id="archivo" hidden accept=".epub,.txt,.md,application/epub+zip,text/plain,text/markdown">'
-      + '</label></div>'
-      + '<p class="nota" id="importa-estado">' + esc(textoImporta()) + '</p>'
       + '<div id="nube" class="nube" hidden></div>'
-      + (fichas.length ? '<h2 class="biblio-titulo">Biblioteca</h2><ul class="fichas">' + fichas.join('') + '</ul>'
-        : '<section class="tarjeta"><h2>Todavía no hay libros</h2><p>Abre un '
-          + 'EPUB o un TXT: se guarda aquí, con su índice, y se puede escuchar '
-          + 'sin conexión desde cualquier párrafo.</p></section>')
+      + (fichas.length
+        ? '<div class="estante-cabeza"><h2 class="biblio-titulo">Biblioteca <span>' + libros.length + '</span></h2>'
+          + '<label class="boton" tabindex="0">' + ico('mas') + 'Añadir libro' + abrir + '</label></div>'
+          + '<p class="nota" id="importa-estado">' + esc(textoImporta()) + '</p>'
+          + '<ul class="estante">' + fichas.join('') + '</ul>'
+        : '<section class="vacio">' + SELLO + '<h2>Tu biblioteca está vacía</h2>'
+          + '<p>Abre un EPUB o un TXT: se guarda aquí, con su índice, y se puede escuchar '
+          + 'sin conexión desde cualquier párrafo.</p>'
+          + '<label class="boton principal" tabindex="0">' + ico('mas') + 'Abrir un libro' + abrir + '</label>'
+          + '<p class="nota" id="importa-estado">' + esc(textoImporta()) + '</p></section>')
       + '</main>';
 
     pintaNube();
@@ -374,6 +471,12 @@
       const f = ev.target.files && ev.target.files[0];
       ev.target.value = '';
       if (f) importa(f);
+    });
+    // con el teclado, la etiqueta abre el archivo como un botón
+    $('#archivo').parentElement.addEventListener('keydown', (ev) => {
+      if (ev.key !== 'Enter' && ev.key !== ' ') return;
+      ev.preventDefault();
+      $('#archivo').click();
     });
     vista.querySelectorAll('.quita').forEach((b) => b.addEventListener('click', async () => {
       const l = libros.find((x) => x.id === b.dataset.id);
@@ -432,8 +535,9 @@
     else if (e.error) t = e.error;
     else if (!e.permiso) t = 'Para traer lo de tus otros aparatos, toca Sincronizar.';
     else t = e.ultima ? 'Al día con Drive ' + haceCuanto(e.ultima) + '.' : 'Conectado a Drive.';
-    el.innerHTML = '<span class="' + (e.error ? 'mal' : 'nota') + '">' + esc(t) + '</span>'
-      + '<button type="button" id="b-nube"' + (e.trabajando ? ' disabled' : '') + '>☁ Sincronizar</button>';
+    el.innerHTML = ico('nube') + '<span class="' + (e.error ? 'mal' : 'nota') + '">' + esc(t) + '</span>'
+      + '<button type="button" id="b-nube"' + (e.trabajando ? ' disabled' : '') + '>' + ico('refresca')
+      + 'Sincronizar</button>';
     $('#b-nube').addEventListener('click', () => Nube.ahora());
   }
 
@@ -543,32 +647,35 @@
 
     document.body.classList.toggle('paginas', A.lec.modo === 'paginas');
     vista.innerHTML = '<header class="cabeza">'
-      + '<a class="boton icono" href="#/" aria-label="Biblioteca">←</a>'
+      + '<a class="boton icono" href="#/" aria-label="Biblioteca" title="Biblioteca">' + ico('atras') + '</a>'
       + '<div class="rotulos"><b>' + esc(O.libro.titulo) + '</b>'
       + '<span id="capitulo" class="nota"></span></div>'
       + (O.hayNotas ? '<button type="button" class="boton" id="b-notas"></button>' : '')
-      + '<button type="button" class="boton icono" id="b-indice" aria-label="Índice" title="Índice">☰</button>'
+      + '<button type="button" class="boton icono" id="b-indice" aria-label="Índice" title="Índice">'
+      + ico('indice') + '</button>'
       + '</header>'
       + '<main class="lectura">'
       + '<div id="cornisa" class="cornisa" title="Ver sólo la página, o los mandos"></div>'
       + '<div id="hoja"><article id="texto" class="texto" lang="'
       + esc(O.libro.lengua || 'es') + '"></article></div>'
       + '<div id="folio" class="folio" title="Ver sólo la página, o los mandos"></div></main>'
-      + '<button type="button" id="b-sigue" class="boton principal flota" hidden>Ir a lo que suena</button>'
+      + '<button type="button" id="b-sigue" class="boton principal flota" hidden>' + ico('sigue')
+      + 'Ir a lo que suena</button>'
       + '<footer class="mandos"><p id="voz-aviso" class="nota" aria-live="polite"></p>'
-      + '<div class="avance"><span id="av-pag"></span>'
+      + '<div class="avance"><span id="av-pag"></span><div class="cinta">'
+      + '<div class="marcas" aria-hidden="true">' + marcas(O) + '</div>'
       + '<input type="range" id="avance" min="0" max="' + Math.max(0, O.t.length - 1)
-      + '" step="1" aria-label="Avance en el libro"><span id="av-pct"></span></div>'
+      + '" step="1" aria-label="Avance en el libro"></div><span id="av-pct"></span></div>'
       + '<div class="fila">'
-      + '<button type="button" id="b-sueno" class="lado" aria-label="Temporizador: apagar la voz dentro de un rato" title="Temporizador">☾</button>'
-      + '<button type="button" id="b-atras" aria-label="Frase anterior">⏮</button>'
-      + '<button type="button" id="b-dice" class="principal grande" aria-label="Leer">▶</button>'
-      + '<button type="button" id="b-adelante" aria-label="Frase siguiente">⏭</button>'
+      + '<button type="button" id="b-sueno" class="lado" aria-label="Temporizador: apagar la voz dentro de un rato" title="Temporizador"></button>'
+      + '<button type="button" id="b-atras" aria-label="Frase anterior" title="Frase anterior">' + ico('anterior') + '</button>'
+      + '<button type="button" id="b-dice" class="principal grande" aria-label="Leer">' + ico('play') + '</button>'
+      + '<button type="button" id="b-adelante" aria-label="Frase siguiente" title="Frase siguiente">' + ico('siguiente') + '</button>'
       + '<button type="button" id="b-aspecto" class="lado" aria-label="Aspecto: páginas, letra y tema" title="Aspecto">Aa</button>'
-      + '</div><div class="fila velocidad">'
-      + '<button type="button" id="b-lento" aria-label="Más despacio">−</button>'
+      + '</div><div class="fila velocidad" role="group" aria-label="Velocidad">'
+      + '<button type="button" id="b-lento" aria-label="Más despacio" title="Más despacio">' + ico('menos') + '</button>'
       + '<span id="vel" aria-live="polite"></span>'
-      + '<button type="button" id="b-rapido" aria-label="Más deprisa">+</button>'
+      + '<button type="button" id="b-rapido" aria-label="Más deprisa" title="Más deprisa">' + ico('mas') + '</button>'
       + '</div></footer>';
 
     $('#b-indice').addEventListener('click', () => abreIndice(O));
@@ -618,7 +725,7 @@
     // por páginas, de un tramo a otro se pasa como de página: sin botones
     const pag = enPaginas();
     const f = document.createDocumentFragment();
-    if (i > 0 && !pag) f.appendChild(botonTramo(O, i - 1, '← '));
+    if (i > 0 && !pag) f.appendChild(botonTramo(O, i - 1, true));
     let capitular = false;   // el primer párrafo de un capítulo lleva letra capitular
     for (let p = tr.desde; p < tr.hasta; p++) {
       const n = O.h[p];
@@ -636,19 +743,20 @@
       }
       f.appendChild(el);
     }
-    if (i < O.tramos.length - 1 && !pag) f.appendChild(botonTramo(O, i + 1, '', ' →'));
+    if (i < O.tramos.length - 1 && !pag) f.appendChild(botonTramo(O, i + 1, false));
     art.replaceChildren(f);
     maqueta();
     pintaCapitulo(O, tr.desde);
     if (L.sonando === O && Voz.estado().estado !== 'parada') resalta(O, Voz.estado().i);
   }
 
-  function botonTramo(O, i, antes, despues) {
+  function botonTramo(O, i, antes) {
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'tramo';
     const e = entradaDe(O, O.tramos[i].desde);
-    b.textContent = (antes || '') + (e ? e.t : 'Sigue') + (despues || '');
+    b.innerHTML = (antes ? ico('atras') : '') + '<span>' + esc(e ? e.t : 'Sigue') + '</span>'
+      + (antes ? '' : ico('adelante'));
     b.addEventListener('click', (ev) => {
       ev.stopPropagation();
       dejaDeSeguir();
@@ -679,9 +787,22 @@
       quedan(O, q, c || 0)].filter(Boolean).join(' · ');
     const pct = O.t.length > 1 ? Math.round((100 * p) / (O.t.length - 1)) : 0;
     const av = $('#avance');
-    if (av && !L.arrastra) av.value = p;
+    if (av && !L.arrastra) { av.value = p; llenaCinta(av); }
     $('#av-pag').textContent = pag.replace(/\/.*$/, '');
     $('#av-pct').textContent = pct + ' %';
+  }
+
+  /** Lo andado de la cinta del avance, hasta donde está su botón. */
+  const llenaCinta = (av) => av.style.setProperty('--f', (+av.value / Math.max(1, +av.max)).toFixed(4));
+
+  /** Las marcas de los capítulos en la cinta del avance (si son tantos que
+   *  no se verían, ninguna). */
+  function marcas(O) {
+    capituloDe(O, 0);   // deja puesto O.nivelCap
+    const n = Math.max(1, O.t.length - 1);
+    const caps = O.plano.filter((e) => e.nivel <= O.nivelCap && e.p > 0 && e.p < n);
+    if (caps.length > 60) return '';
+    return caps.map((e) => '<i style="left:' + ((100 * e.p) / n).toFixed(2) + '%"></i>').join('');
   }
 
   /** El capítulo en que cae un párrafo: la entrada de primer nivel del
@@ -776,6 +897,7 @@
     const w = dos ? 2 * col + hueco : col;
     Object.assign(art.style, { width: w + 'px', height: Math.max(80, alto) + 'px',
       columnWidth: col + 'px', columnGap: hueco + 'px' });
+    hoja.classList.toggle('dos', dos);   // el pliegue del libro abierto
     P.paso = w + hueco;
     P.medida = hoja.clientWidth + 'x' + hoja.clientHeight;
     cuentaPaginas();
@@ -809,6 +931,7 @@
    *  vuelve a repartir en capas la tira entera —cientos de páginas— al
    *  empezar cada paso, y la página se traba. */
   let _desliza = 0;
+  const QUIETO = window.matchMedia ? matchMedia('(prefers-reduced-motion: reduce)') : { matches: false };
   function muestra(n, anima) {
     const art = $('#texto');
     if (!art || !enPaginas()) return;
@@ -816,7 +939,8 @@
     const x = -P.pagina * P.paso;
     const desde = P.x;
     cancelAnimationFrame(_desliza);
-    if (!anima || desde === x) { corre(art, x); return; }
+    // con «menos movimiento» en el teléfono, la página cambia sin deslizarse
+    if (!anima || desde === x || QUIETO.matches) { corre(art, x); return; }
     let t0 = 0;
     const cuadro = (t) => {
       if (!t0) t0 = t;
@@ -1024,11 +1148,11 @@
     if (!enPaginas() || A.vistaAyuda) return;
     const d = document.createElement('div');
     d.className = 'ayuda';
-    d.innerHTML = '<div><b>‹</b>Página anterior</div>'
-      + '<div class="medio"><span>Toca una frase<br>para oírla desde ahí</span>'
-      + '<span>Toca el número de página<br>para ver sólo la página</span>'
+    d.innerHTML = '<div><b>' + ico('izquierda') + '</b>Página anterior</div>'
+      + '<div class="medio"><span>' + ico('toca') + 'Toca una frase<br>para oírla desde ahí</span>'
+      + '<span>' + ico('libro') + 'Toca el número de página<br>para ver sólo la página</span>'
       + '<button type="button" class="principal">Entendido</button></div>'
-      + '<div><b>›</b>Página siguiente</div>';
+      + '<div><b>' + ico('derecha') + '</b>Página siguiente</div>';
     d.addEventListener('click', (ev) => {
       ev.stopPropagation();
       d.remove();
@@ -1043,6 +1167,7 @@
     const av = $('#avance');
     av.addEventListener('input', () => {
       L.arrastra = true;
+      llenaCinta(av);
       const p = +av.value;
       const e = entradaDe(O, p);
       aviso([pagina(O.libro.paginas, p, 0), e ? e.t : ''].filter(Boolean).join(' · '));
@@ -1069,7 +1194,10 @@
         g.querySelectorAll('button[data-v]').forEach((b) =>
           b.setAttribute('aria-pressed', b.dataset.v === v ? 'true' : 'false'));
       });
-      $('#da-letra').textContent = A.lec.letra + ' %';
+      const il = LETRAS.indexOf(+A.lec.letra);
+      $('#da-letra').innerHTML = '<span class="escala" aria-hidden="true">'
+        + LETRAS.map((_, j) => '<i' + (j <= il ? ' class="si"' : '') + '></i>').join('')
+        + '</span><span>' + A.lec.letra + ' %</span>';
       $('#da-menos').disabled = A.lec.letra <= LETRAS[0];
       $('#da-mas').disabled = A.lec.letra >= LETRAS[LETRAS.length - 1];
       $('#da-completa').hidden = A.lec.modo !== 'paginas';
@@ -1130,13 +1258,16 @@
     const d = $('#d-sueno');
     const ul = $('#sueno-lista');
     const s = L.sueno;
-    const op = [['cap', 'Al acabar el capítulo']]
-      .concat([10, 20, 30, 45, 60, 90].map((m) => [String(m), 'Dentro de ' + m + ' min']))
-      .concat(s ? [['no', 'Quitar el temporizador']] : []);
+    // los minutos, en fichas; lo demás, a lo ancho
+    const op = [10, 20, 30, 45, 60, 90].map((m) => [String(m), '<b>' + m + '</b><small>min</small>', '',
+      'Dentro de ' + m + ' minutos'])
+      .concat([['cap', ico('libro') + 'Al acabar el capítulo', 'ancho']])
+      .concat(s ? [['no', ico('quita') + 'Quitar el temporizador', 'ancho quitar']] : []);
     ul.innerHTML = op.map((x) => {
       const yo = s && ((x[0] === 'cap' && s.parrafo !== undefined) || String(s.min) === x[0]);
-      return '<li><button type="button" data-v="' + x[0] + '"' + (yo ? ' aria-pressed="true"' : '')
-        + '>' + esc(x[1]) + '</button></li>';
+      return '<li' + (x[2] ? ' class="' + x[2] + '"' : '') + '><button type="button" data-v="' + x[0] + '"'
+        + (yo ? ' aria-pressed="true"' : '') + (x[3] ? ' aria-label="' + x[3] + '"' : '')
+        + '>' + x[1] + '</button></li>';
     }).join('');
     ul.onclick = (ev) => {
       const b = ev.target.closest('button[data-v]');
@@ -1169,14 +1300,14 @@
     if (s && s.hasta && Date.now() >= s.hasta && Voz.estado().estado !== 'diciendo') L.sueno = null;
     if (!b) return;
     if (!L.sueno) {
-      b.textContent = '☾';
+      b.innerHTML = ico('luna');
       b.classList.remove('activo');
       return;
     }
     b.classList.add('activo');
-    b.textContent = L.sueno.hasta
-      ? '☾ ' + Math.max(1, Math.ceil((L.sueno.hasta - Date.now()) / 60000)) + '′'
-      : '☾ cap.';
+    b.innerHTML = ico('luna') + '<span>' + (L.sueno.hasta
+      ? Math.max(1, Math.ceil((L.sueno.hasta - Date.now()) / 60000)) + '′'
+      : 'cap.') + '</span>';
   }
   setInterval(pintaSueno, 15000);
 
@@ -1235,7 +1366,7 @@
     const b = $('#b-notas');
     if (!b) return;
     const si = leeNotas(O);
-    b.textContent = si ? 'Con notas' : 'Sin notas';
+    b.innerHTML = ico('notas') + '<span>' + (si ? 'Con notas' : 'Sin notas') + '</span>';
     b.setAttribute('aria-pressed', si ? 'true' : 'false');
     b.title = si ? 'Lee las notas al pie, detrás de su párrafo. Toca para leer sólo el texto.'
       : 'Lee sólo el texto. Toca para leer también las notas al pie.';
@@ -1353,10 +1484,13 @@
   }
 
   function pintaEstado() {
+    // las ondas de la biblioteca se mueven sólo mientras dice
+    document.body.classList.toggle('diciendo', Voz.estado().estado === 'diciendo');
     const b = $('#b-dice');
     if (!b) return;
     const diciendo = L.sonando === L.vista && Voz.estado().estado === 'diciendo';
-    b.textContent = diciendo ? '⏸' : '▶';
+    if (b.classList.contains('diciendo') !== diciendo || !b.firstChild) b.innerHTML = ico(diciendo ? 'pausa' : 'play');
+    b.classList.toggle('diciendo', diciendo);
     b.setAttribute('aria-label', diciendo ? 'Pausa' : 'Leer');
   }
 
@@ -1558,56 +1692,73 @@
 
   function pintaAjustes() {
     const lenguas = Object.keys(Voz.LENGUAS);
-    vista.innerHTML = '<main>'
-      + '<header class="portadilla"><div><h1>Ajustes</h1>'
-      + '<p class="sub">Las voces se bajan una vez y quedan en el teléfono.</p></div>'
-      + '<a class="boton" href="#/">← Biblioteca</a></header>'
-      + '<section class="tarjeta"><h2>Velocidad</h2>'
-      + '<select id="a-vel">'
-      + VELS.concat(VELS.includes(+A.vel || 1) ? [] : [+A.vel])
-        .sort((a, b) => a - b)
-        .map((v) => '<option value="' + v + '">' + velTexto(v)
-          + (v === 1 ? ' (normal)' : '') + '</option>').join('')
-      + '</select></section>'
-      + '<section class="tarjeta"><h2>Tema</h2>'
-      + '<select id="a-tema">'
-      + [['auto', 'Como el teléfono (claro u oscuro)'], ['claro', 'Claro'], ['sepia', 'Sepia'],
-        ['oscuro', 'Oscuro'], ['noche', 'Noche (negro, para leer a oscuras)']]
-        .map((x) => '<option value="' + x[0] + '">' + esc(x[1]) + '</option>').join('')
-      + '</select><p class="nota">La letra, los renglones y leer por páginas o de corrido: '
-      + 'con el botón Aa, dentro del libro.</p></section>'
-      + '<section class="tarjeta"><h2>Voces</h2>'
+    vista.innerHTML = '<main class="ajustes">'
+      + '<header class="portadilla vuelta"><a class="boton icono" href="#/" aria-label="Biblioteca" '
+      + 'title="Biblioteca">' + ico('atras') + '</a><div><h1>Ajustes</h1>'
+      + '<p class="sub">Las voces se bajan una vez y quedan en el teléfono.</p></div></header>'
+      + '<h2 class="seccion">La voz</h2>'
+      + '<section class="tarjeta"><h3 class="titulo-tarjeta">' + ico('velocidad') + 'Velocidad</h3>'
+      + '<div class="ajuste-vel">'
+      + '<button type="button" id="b-lento" class="icono" aria-label="Más despacio" title="Más despacio">'
+      + ico('menos') + '</button>'
+      + '<input type="range" id="a-vel" min="' + VELS[0] + '" max="' + VELS[VELS.length - 1]
+      + '" step="0.1" aria-label="Velocidad">'
+      + '<button type="button" id="b-rapido" class="icono" aria-label="Más deprisa" title="Más deprisa">'
+      + ico('mas') + '</button>'
+      + '<output id="vel" for="a-vel" aria-live="polite"></output></div></section>'
+      + '<section class="tarjeta"><h3 class="titulo-tarjeta">' + ico('onda') + 'Voces</h3>'
       + '<p class="nota">Una por lengua: la del libro decide cuál suena. El motor '
       + '(29 MB) es común a todas y se baja con la primera.</p>'
       + lenguas.map((l) => '<div class="lengua" data-l="' + l + '">'
-        + '<label class="campo" for="a-voz-' + l + '">' + esc(Voz.LENGUAS[l]) + '</label>'
+        + '<div class="lengua-cabeza"><label class="campo" for="a-voz-' + l + '">' + esc(Voz.LENGUAS[l])
+        + '</label><span class="sello-voz"></span></div>'
         + '<select id="a-voz-' + l + '">'
         + Voz.VOCES.filter((v) => v[2] === l).map((v) => '<option value="' + v[0] + '">'
           + esc(v[1]) + '</option>').join('')
         + '</select><p class="nota estado"></p>'
         + '<div class="barra" hidden><div></div></div>'
-        + '<div class="botones"><button type="button" class="baja" hidden>Bajar</button>'
-        + '<button type="button" class="quita-voz" hidden>Quitarla</button></div></div>').join('')
+        + '<div class="botones"><button type="button" class="baja" hidden>' + ico('descarga')
+        + 'Bajar</button>'
+        + '<button type="button" class="quita-voz" hidden>' + ico('quita') + 'Quitarla</button></div></div>').join('')
       + '</section>'
+      + '<h2 class="seccion">El aspecto</h2>'
+      + '<section class="tarjeta"><h3 class="titulo-tarjeta">' + ico('tema') + 'Tema</h3>'
+      + '<div class="temas" data-ajuste="tema">' + botonesTema() + '</div>'
+      + '<p class="nota">La letra, los renglones y leer por páginas o de corrido: '
+      + 'con el botón <b class="aa">Aa</b>, dentro del libro.</p></section>'
+      + '<h2 class="seccion">Tus libros</h2>'
       + '<section class="tarjeta" id="a-nube"></section>'
-      + '<section class="tarjeta"><h2>Espacio</h2><p class="nota" id="a-espacio">…</p></section>'
-      + '<p class="nota"><a href="pruebas.html">Pruebas de voz (Fase 0)</a></p>'
+      + '<section class="tarjeta"><h3 class="titulo-tarjeta">' + ico('disco') + 'Espacio</h3>'
+      + '<div id="a-espacio"><p class="nota">…</p></div></section>'
+      + '<p class="nota pie-ajustes"><a href="pruebas.html">Pruebas de voz</a> · '
+      + '<a href="privacidad.html">Privacidad</a></p>'
       + '</main>';
 
+    // la velocidad: la cinta, o un paso con − y + (como en el libro)
     const vel = $('#a-vel');
-    vel.value = String(A.vel || 1);
-    vel.addEventListener('change', () => {
-      A.vel = +vel.value;
+    vel.addEventListener('input', () => {
+      A.vel = Math.round(+vel.value * 10) / 10;
       guardaAjustes();
+      pintaVelocidad();
+    });
+    vel.addEventListener('change', () => {
       if (Voz.estado().estado !== 'parada') Voz.cambia({ vel: A.vel });
     });
-    const tema = $('#a-tema');
-    tema.value = A.tema || 'auto';
-    tema.addEventListener('change', () => {
-      A.tema = tema.value;
+    $('#b-lento').addEventListener('click', () => ponVelocidad(-1));
+    $('#b-rapido').addEventListener('click', () => ponVelocidad(+1));
+    pintaVelocidad();
+    const temas = $('.ajustes .temas');
+    const marcaTema = () => temas.querySelectorAll('button').forEach((b) =>
+      b.setAttribute('aria-pressed', b.dataset.v === (A.tema || 'auto') ? 'true' : 'false'));
+    temas.addEventListener('click', (ev) => {
+      const b = ev.target.closest('button[data-v]');
+      if (!b) return;
+      A.tema = b.dataset.v;
       guardaAjustes();
       aplicaAspecto();
+      marcaTema();
     });
+    marcaTema();
 
     lenguas.forEach((l) => {
       const caja = $('.lengua[data-l="' + l + '"]');
@@ -1616,15 +1767,20 @@
       const pintaUna = async () => {
         const voz = sel.value;
         const est = $('.estado', caja);
+        const sello = $('.sello-voz', caja);
         if (L.hay[base(voz)] === undefined) {
-          est.textContent = 'Mirando…';
+          sello.className = 'sello-voz';
+          sello.textContent = 'Mirando…';
           try { L.hay[base(voz)] = await Voz.hay(voz); } catch (_) { L.hay[base(voz)] = false; }
         }
         if (sel.value !== voz) return;
+        const hay = L.hay[base(voz)];
         est.className = 'nota estado';
-        est.textContent = L.hay[base(voz)] ? 'Bajada.' : 'No está bajada.';
-        $('.baja', caja).hidden = L.hay[base(voz)];
-        $('.quita-voz', caja).hidden = !L.hay[base(voz)];
+        est.textContent = '';
+        sello.className = 'sello-voz' + (hay ? ' si' : '');
+        sello.innerHTML = hay ? ico('hecho') + 'Bajada' : 'Sin bajar';
+        $('.baja', caja).hidden = hay;
+        $('.quita-voz', caja).hidden = !hay;
       };
       sel.addEventListener('change', () => {
         A.voces[l] = sel.value;
@@ -1632,7 +1788,7 @@
         pintaUna();
       });
       $('.baja', caja).addEventListener('click', async (ev) => {
-        const b = ev.target;
+        const b = ev.currentTarget;   // no ev.target: puede ser el icono
         const voz = sel.value;
         const barra = $('.barra', caja);
         const est = $('.estado', caja);
@@ -1678,7 +1834,7 @@
     const el = $('#a-nube');
     if (!el) return;
     const e = Nube.estado();
-    let h = '<h2>Sincronizar con Google Drive</h2>'
+    let h = '<h3 class="titulo-tarjeta">' + ico('nube') + 'Sincronizar con Google Drive</h3>'
       + '<p class="nota">Los libros que abras aquí salen también en tus otros aparatos, '
       + 'con la frase por la que vas. Se guardan en una carpeta oculta de tu Drive que '
       + 'sólo ve Lector. Sin conexión todo sigue igual: se pone al día después. '
@@ -1704,7 +1860,7 @@
           + 'sincronizar: ' + solo.map((t) => '«' + esc(t) + '»').join(', ')
           + '. Vuelve a abrir su archivo y se subirán, sin perder por dónde vas.</p>' : '')
         + '<div class="botones"><button type="button" class="principal" id="a-sincroniza"'
-        + (e.trabajando ? ' disabled' : '') + '>☁ Sincronizar ahora</button>'
+        + (e.trabajando ? ' disabled' : '') + '>' + ico('refresca') + 'Sincronizar ahora</button>'
         + '<button type="button" id="a-desconecta">Desconectar</button></div>'
         + '<p class="nota">Desconectar olvida la sesión en este aparato; los libros se quedan. '
         + 'Para borrar lo guardado en Drive: Drive → Configuración → Administrar aplicaciones '
@@ -1727,11 +1883,12 @@
     try {
       const e = await navigator.storage.estimate();
       const fijo = navigator.storage.persisted ? await navigator.storage.persisted() : false;
-      el.textContent = 'Libros y voces ocupan ' + mb(e.usage || 0) + '. '
-        + (fijo ? 'El navegador no los borrará para hacer sitio.'
-          : 'El navegador podría borrarlos si se queda sin sitio: al guardar un libro se le pide que no.');
+      el.innerHTML = '<p class="cifra-grande"><b>' + mb(e.usage || 0) + '</b>ocupan los libros y las voces</p>'
+        + '<p class="nota">' + (fijo ? 'El navegador no los borrará para hacer sitio.'
+          : 'El navegador podría borrarlos si se queda sin sitio: al guardar un libro se le pide que no.')
+        + '</p>';
     } catch (_) {
-      el.textContent = 'Este navegador no dice cuánto ocupa.';
+      el.innerHTML = '<p class="nota">Este navegador no dice cuánto ocupa.</p>';
     }
   }
 
@@ -1740,6 +1897,9 @@
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch((e) => console.warn('sin service worker:', e));
   }
+  // las letras (fuentes/) pueden llegar después de partir el libro en
+  // páginas: con ellas cambian las medidas, y se vuelve a partir
+  if (document.fonts) document.fonts.addEventListener('loadingdone', () => remaqueta(true));
   /* La nube: lo que cambia en Drive se pinta; lo que suena no se toca. */
   Nube.on('estado', () => {
     const r = ruta();
