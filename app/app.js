@@ -126,10 +126,11 @@
   };
 
   /* Las páginas del tramo pintado (sólo leyendo por páginas): cuántas son,
-   * cuál se ve, cuánto se corre el texto de una a otra, y el «ancla», la
-   * letra con que empieza la que se ve, para no perderla si cambia la
-   * medida de la hoja (girar el teléfono, cambiar la letra). */
-  const P = { pagina: 0, total: 1, paso: 0, ancla: null };
+   * cuál se ve, cuánto se corre el texto de una a otra, cuánto está corrido
+   * ahora (`x`, también a medio deslizar), y el «ancla», la letra con que
+   * empieza la que se ve, para no perderla si cambia la medida de la hoja
+   * (girar el teléfono, cambiar la letra). */
+  const P = { pagina: 0, total: 1, paso: 0, x: 0, ancla: null };
 
   function abierto(libro, texto) {
     const O = { libro: libro, t: texto.t, h: texto.h || {}, k: texto.k || {},
@@ -797,17 +798,34 @@
     if (r.length) P.total = paginaDeX(r[r.length - 1].left) + 1;
   }
 
-  /** Muestra la página `n` del tramo, deslizándola si `anima`. */
+  /** Corre la tira de páginas hasta `x` (y apunta dónde se queda). */
+  function corre(art, x) {
+    P.x = x;
+    art.style.transform = 'translateX(' + x + 'px)';
+  }
+
+  /** Muestra la página `n` del tramo, deslizándola si `anima`. Se desliza a
+   *  mano, cuadro a cuadro, y no con una transición CSS: con ella Chrome
+   *  vuelve a repartir en capas la tira entera —cientos de páginas— al
+   *  empezar cada paso, y la página se traba. */
+  let _desliza = 0;
   function muestra(n, anima) {
     const art = $('#texto');
     if (!art || !enPaginas()) return;
     P.pagina = Math.max(0, Math.min(P.total - 1, n));
-    art.style.transition = anima ? '' : 'none';
-    art.style.transform = 'translateX(' + (-P.pagina * P.paso) + 'px)';
-    if (!anima) {
-      void art.offsetWidth;
-      art.style.transition = '';
-    }
+    const x = -P.pagina * P.paso;
+    const desde = P.x;
+    cancelAnimationFrame(_desliza);
+    if (!anima || desde === x) { corre(art, x); return; }
+    let t0 = 0;
+    const cuadro = (t) => {
+      if (!t0) t0 = t;
+      const k = Math.min(1, (t - t0) / 300);
+      // frena al llegar, como la página que se suelta
+      corre(art, Math.round(desde + (x - desde) * (1 - Math.pow(1 - k, 3))));
+      if (k < 1) _desliza = requestAnimationFrame(cuadro);
+    };
+    _desliza = requestAnimationFrame(cuadro);
   }
 
   /** La página en que cae la letra `c` del párrafo `p` del tramo. */
@@ -966,16 +984,14 @@
       const tope = (dx > 0 && P.pagina === 0 && L.tramo === 0)
         || (dx < 0 && P.pagina === P.total - 1 && L.tramo === L.vista.tramos.length - 1);
       t0.dx = dx;
-      const art = $('#texto');
-      art.style.transition = 'none';
-      art.style.transform = 'translateX(' + (-P.pagina * P.paso + (tope ? dx / 4 : dx)) + 'px)';
+      cancelAnimationFrame(_desliza);
+      corre($('#texto'), -P.pagina * P.paso + (tope ? dx / 4 : dx));
     }, { passive: true });
     const suelta = () => {
       const t = t0;
       t0 = null;
       if (!t || !t.lado) return;
       L.sinClic = Date.now() + 400;
-      $('#texto').style.transition = '';
       const rapido = Math.abs(t.dx) / Math.max(1, Date.now() - t.t) > 0.35;
       if (Math.abs(t.dx) > 60 || (rapido && Math.abs(t.dx) > 20)) pasaPagina(t.dx < 0 ? 1 : -1);
       else muestra(P.pagina, true);

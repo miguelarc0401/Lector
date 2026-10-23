@@ -511,10 +511,10 @@ body.paginas #hoja {
 }
 
 /* will-change: la tira de páginas va en su propia capa, y pasar de página
- * (o arrastrarla con el dedo) es sólo moverla, sin volver a pintar la letra */
+ * (o arrastrarla con el dedo) es sólo moverla, sin volver a pintar la letra.
+ * Sin transición: la desliza app.js cuadro a cuadro (ver muestra()). */
 body.paginas .texto {
   column-fill: auto;
-  transition: transform .3s cubic-bezier(.2, .7, .3, 1);
   will-change: transform;
 }
 
