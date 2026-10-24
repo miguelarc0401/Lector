@@ -48,7 +48,9 @@
 
   /* El silencio que se le pone a cada trozo al final, dentro del propio
    * audio: así la pausa entre frases y la de fin de párrafo no piden un
-   * temporizador, que con la pantalla apagada llegaría tarde. */
+   * temporizador, que con la pantalla apagada llegaría tarde. El de la
+   * frase va también tras cada punto y coma, a media frase: ése lo pone
+   * piper.js entre las dos partes. */
   const PAUSA = { frase: 0.12, parrafo: 0.55 };
 
   /* Un trozo no pasa de esta medida. Piper no tiene el defecto de Chrome
@@ -133,7 +135,7 @@
   async function prueba(id, texto, vel) {
     const p = partes(id);
     const q = { tipo: 'di', voz: p.voz, hablante: p.hablante,
-      texto: paraDecir(texto, lenguaDe(id)), vel: vel || 1 };
+      texto: paraDecir(texto, lenguaDe(id)), vel: vel || 1, pausa: PAUSA.frase };
     await pide(q);
     W.cargada = p.voz;
     const r = await pide(q);
@@ -329,10 +331,62 @@
     });
   }
 
+  /* La cruz de las fechas: «Fernando IV († 1312)» es «muerto en 1312», que
+   * espeak se la salta y sólo dice el año. «† ca. 1600» es «muerto hacia
+   * 1600»; «† p. 1538», «muerto después de 1538»; «† 21 de junio 1377»,
+   * «muerto el 21…». Sin fecha detrás —«Imprimatur: † José María», la cruz
+   * de la firma de un obispo— no se dice nada. */
+  const CRUZ = /†\s*(?:(ca\.|c\.|hacia)|(p\.|post))?\s*/g;
+  // si el nombre de antes de la cruz empieza por uno de mujer, «muerta»
+  const MUJER = new Set(('juana isabel maría catalina margarita ana leonor cristina '
+    + 'blanca urraca berenguela teresa beatriz constanza mafalda luisa carlota victoria '
+    + 'sancha elena brígida eduvigis clara inés ángela magdalena coleta francisca mariana '
+    + 'rita delfina colomba matilde gertrudis úrsula lucía angelina '
+    + 'santa beata reina doña d.ª princesa emperatriz infanta condesa duquesa sor abadesa').split(' '));
+  const ENLACE = new Set('de del da di della von van'.split(' '));
+
+  /** El nombre con que acaba `antes`: las palabras con mayúscula del final
+   *  y los «de» («de la») de en medio. «…bajo la dirección de María García
+   *  de Toledo» es «María García de Toledo»; «…había muerto», ninguno. */
+  function nombreAlFinal(antes) {
+    const ps = antes.match(/[\p{L}.ª]+/gu) || [];
+    const sigue = (k) => k < ps.length && /^\p{Lu}/u.test(ps[k]);
+    let k = ps.length;
+    for (;;) {
+      const w = ps[k - 1];
+      if (k > 0 && /^\p{Lu}/u.test(w)) k--;
+      else if (k > 0 && ENLACE.has(w) && sigue(k)) k--;
+      else if (k > 1 && /^l[ao]s?$/.test(w) && ENLACE.has(ps[k - 2]) && sigue(k)) k -= 2;
+      else break;
+    }
+    while (k < ps.length && !/^\p{Lu}/u.test(ps[k])) k++;
+    return ps.slice(k);
+  }
+
+  function cruces(t) {
+    if (!t.includes('†')) return t;
+    return t.replace(CRUZ, (m, hacia, despues, i) => {
+      const tras = t.slice(i + m.length);
+      if (!/^\d/.test(tras)) return (hacia || despues || '') + (hacia || despues ? ' ' : '');
+      // de quién es: el nombre de antes del paréntesis, hasta la coma
+      // («Isabel, esposa de Fernando (†…)» es Fernando), por su primera
+      // palabra: «Santa Catalina de Siena» es una mujer; «Pablo de Santa
+      // María» y «José María», hombres
+      const antes = t.slice(Math.max(0, i - 80), i).replace(/\(\s*$/, '')
+        .split(/[,;:()—]/).pop();
+      const primera = (nombreAlFinal(antes)[0] || '').toLowerCase();
+      const quien = MUJER.has(primera) ? 'muerta' : 'muerto';
+      if (hacia) return quien + ' hacia ';
+      if (despues) return quien + ' después de ';
+      if (/^\d{1,2} de \p{L}/u.test(tras)) return quien + ' el ';
+      return quien + ' en ';
+    });
+  }
+
   /** Lo que se le da a Piper para que diga `texto`, en la lengua de la voz. */
   function paraDecir(texto, lengua) {
     if (lengua !== 'es') return texto;
-    return romanos(texto);
+    return romanos(cruces(texto));
   }
 
   /** El WAV de Piper con silencio al final. La cabecera es la de 44 bytes que
@@ -474,7 +528,8 @@
     const fria = W.cargada !== p.voz;
     h = { r: null };
     h.p = pide({ tipo: 'di', voz: p.voz, hablante: p.hablante,
-      texto: paraDecir(tz.texto, lenguaDe(S.voz)), vel: S.vel }).then((d) => {
+      texto: paraDecir(tz.texto, lenguaDe(S.voz)), vel: S.vel,
+      pausa: PAUSA.frase }).then((d) => {
       W.cargada = p.voz;
       const wav = conSilencio(d.wav, pausa);
       h.r = { blob: new Blob([wav], { type: 'audio/wav' }),

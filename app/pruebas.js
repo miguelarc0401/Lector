@@ -566,7 +566,21 @@
     ['Luis X y Gregorio IX', 'Luis décimo y Gregorio noveno'],
     ['V. Clemente V y el imperio', 'cinco. Clemente quinto y el imperio'],
     ['los III frayres', 'los tres frayres'],
-    ['p.LXII-LXVI', 'p.sesenta y dos-sesenta y seis']
+    ['p.LXII-LXVI', 'p.sesenta y dos-sesenta y seis'],
+    // la cruz de las fechas de muerte
+    ['Fernando IV († 1312), se apoderaron', 'Fernando cuarto (muerto en 1312), se apoderaron'],
+    ['D.ª Juana I de Navarra († 1305)', 'D.ª Juana primera de Navarra (muerta en 1305)'],
+    ['ya Eduardo III había muerto († 21 de junio 1377)', 'ya Eduardo tercero había muerto (muerto el 21 de junio 1377)'],
+    ['Herrera († ca. 1600) y Pineda († ca.1593)', 'Herrera (muerto hacia 1600) y Pineda (muerto hacia 1593)'],
+    ['Javellus († p. 1538) y Marchia († post 1344)', 'Javellus (muerto después de 1538) y Marchia (muerto después de 1344)'],
+    ['Isabel, esposa de Fernando († 1516)', 'Isabel, esposa de Fernando (muerto en 1516)'],
+    ['Santa Catalina de Siena († 1380)', 'Santa Catalina de Siena (muerta en 1380)'],
+    ['José María Javierre († 1999)', 'José María Javierre (muerto en 1999)'],
+    ['El «Burgense» Pablo de Santa María († 1435)', 'El «Burgense» Pablo de Santa María (muerto en 1435)'],
+    ['Tomás Luis de Victoria († 1608)', 'Tomás Luis de Victoria (muerto en 1608)'],
+    ['bajo la dirección de María García de Toledo († 1426)', 'bajo la dirección de María García de Toledo (muerta en 1426)'],
+    ['A la Beata Colomba de Rieti († 1501)', 'A la Beata Colomba de Rieti (muerta en 1501)'],
+    ['Imprimatur: † José María, obispo', 'Imprimatur: José María, obispo']
   ];
 
   function pintaRomanos() {

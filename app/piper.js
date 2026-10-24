@@ -17,7 +17,8 @@
  * Mensajes que entiende, todos con `id`, y contesta con el mismo `id`:
  *  · { tipo: 'hay', voz }       ¿está todo bajado para esta voz?
  *  · { tipo: 'baja', voz }      bájalo, avisando de cómo va ({ progreso })
- *  · { tipo: 'di', voz, hablante, texto, vel }   el audio, en `wav`
+ *  · { tipo: 'di', voz, hablante, texto, vel, pausa }   el audio, en `wav`;
+ *    `pausa`, los segundos de silencio tras cada punto y coma
  *  · { tipo: 'borra', voz }     quita el modelo de esa voz de la caché
  */
 
@@ -167,8 +168,35 @@ function conPausas(t) {
     .replace(/\s*\n\s*/g, ' ');
 }
 
-async function di(voz, hablante, texto, vel) {
+/* A media frase, Piper se para poco en el punto y coma, y quien lee en voz
+ * alta se para ahí casi como en un punto. Así que cada parte se dice aparte
+ * —y la primera acaba como acaba una frase— y entre una y otra van `pausa`
+ * segundos de silencio. */
+async function di(voz, hablante, texto, vel, pausa) {
   const v = await cargaVoz(voz);
+  const partes = pausa ? texto.split(/(?<=;)\s+/) : [texto];
+  const silencio = Math.round(v.cfg.audio.sample_rate * (pausa || 0));
+  const muestras = [];
+  let msFon = 0, msRed = 0;
+  for (const t of partes) {
+    const r = await suena(v, hablante, t, vel);
+    msFon += r.msFon;
+    msRed += r.msRed;
+    if (muestras.length) muestras.push(new Float32Array(silencio));
+    muestras.push(r.pcm);
+  }
+  const pcm = new Float32Array(muestras.reduce((n, m) => n + m.length, 0));
+  let p = 0;
+  for (const m of muestras) { pcm.set(m, p); p += m.length; }
+  const r = aWav(pcm, v.cfg.audio.sample_rate);
+  // lo que tarda cada mitad, para saber dónde se va el tiempo si no llega
+  r.msFon = msFon;
+  r.msRed = msRed;
+  return r;
+}
+
+/** Un pedazo de texto, en muestras de coma flotante. */
+async function suena(v, hablante, texto, vel) {
   const t0 = performance.now();
   const ids = await fonemas(conPausas(texto), v.cfg.espeak.voice);
   const t1 = performance.now();
@@ -190,11 +218,7 @@ async function di(voz, hablante, texto, vel) {
     entrada.sid = new ort.Tensor('int64', BigInt64Array.from([BigInt(sid)]));
   }
   const salida = await v.sesion.run(entrada);
-  const r = aWav(salida.output.data, v.cfg.audio.sample_rate);
-  // lo que tarda cada mitad, para saber dónde se va el tiempo si no llega
-  r.msFon = t1 - t0;
-  r.msRed = performance.now() - t1;
-  return r;
+  return { pcm: salida.output.data, msFon: t1 - t0, msRed: performance.now() - t1 };
 }
 
 /** Las muestras en coma flotante, a un WAV de 16 bits. */
@@ -267,7 +291,7 @@ async function atiende(ev) {
         }
       }
       const t0 = performance.now();
-      const r = await di(q.voz, q.hablante, q.texto, q.vel);
+      const r = await di(q.voz, q.hablante, q.texto, q.vel, q.pausa);
       responde({ ok: true, wav: r.wav, segundos: r.segundos,
         ms: performance.now() - t0, msFon: r.msFon, msRed: r.msRed }, [r.wav]);
     } else if (q.tipo === 'borra') {
