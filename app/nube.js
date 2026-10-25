@@ -15,6 +15,11 @@
  * `borrado` si se quitó «de todos». Así ponerse al día es pedir la lista,
  * y mandar la posición, cambiar esas propiedades, sin subir nada.
  *
+ * Y uno más para todos, `biblioteca.json` ({ tipo: 'orden', cambiado }):
+ * las colecciones y las marcas y notas de cada libro (Biblioteca.orden).
+ * No se pisa: se mezcla pieza a pieza con lo de aquí (ponOrden), así lo
+ * apuntado en dos aparatos sin red sale en los dos.
+ *
  * El permiso de Google dura una hora y, sin servidor propio, renovarlo
  * tiene que empezar con un toque: la ventana de Google no se abre sola.
  * Se pide con la dirección de Google para apps sin servidor
@@ -39,7 +44,8 @@
   const SUBE = DRIVE + '/upload/drive/v3';
   const ALCANCE = 'https://www.googleapis.com/auth/drive.appdata';
 
-  const CLAVE = 'lector-nube';          // { conectada, ultima, quitados, porBorrar }
+  const CLAVE = 'lector-nube';          // { conectada, ultima, quitados, porBorrar,
+                                        //   ordenVisto, ordenPendiente }
   const PERMISO = 'lector-nube-permiso'; // { token, caduca } (lo escribe oauth.html)
   const IDA = 'lector-nube-ida';         // { estado, vuelta, modo } mientras se entra
 
@@ -55,7 +61,10 @@
     try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) { /* */ }
   }
 
-  const S = Object.assign({ conectada: false, ultima: 0, quitados: [], porBorrar: [] }, leeLS(CLAVE));
+  /* `ordenVisto`: el `cambiado` del archivo de orden la última vez que se
+   * mezcló; `ordenPendiente`: aquí ha cambiado algo desde entonces. */
+  const S = Object.assign({ conectada: false, ultima: 0, quitados: [], porBorrar: [],
+    ordenVisto: '', ordenPendiente: false }, leeLS(CLAVE));
   const guardaS = () => ponLS(CLAVE, S);
 
   /* Lo que la app quiere saber: quién oye y si un libro está sonando. */
@@ -167,9 +176,11 @@
     return r;
   }
 
-  /** Lo que hay en la carpeta, por libro: { id: { ficha, archivo } }. */
+  /** Lo que hay en la carpeta: por libro, { id: { ficha, archivo } }, y el
+   *  archivo de orden. */
   async function lista() {
     const r = {};
+    let orden = null;
     let pagina = '';
     do {
       const q = new URLSearchParams({ spaces: 'appDataFolder', pageSize: '1000',
@@ -178,12 +189,14 @@
       const j = await (await drive('GET', API + '/files?' + q)).json();
       (j.files || []).forEach((f) => {
         const a = f.appProperties || {};
+        // (si dos aparatos lo crearon a la vez, vale el último)
+        if (a.tipo === 'orden' && (!orden || +a.cambiado > +orden.appProperties.cambiado)) orden = f;
         if (!a.libro || (a.tipo !== 'ficha' && a.tipo !== 'archivo')) return;
         (r[a.libro] = r[a.libro] || {})[a.tipo] = f;
       });
       pagina = j.nextPageToken || '';
     } while (pagina);
-    return r;
+    return { libros: r, orden: orden };
   }
 
   /** Sube un archivo nuevo a la carpeta (subida reanudable: vale para
@@ -230,6 +243,8 @@
     _corre = haz().then(() => {
       S.ultima = Date.now();
       guardaS();
+      // lo que se apuntó mientras se sincronizaba, enseguida
+      if (S.ordenPendiente) mandaOrden();
       return true;
     }, (err) => {
       console.warn('nube:', err);
@@ -247,14 +262,16 @@
 
   async function haz() {
     // lo que se quitó «de todos» sin red, primero
-    let remotos = await lista();
+    let listado = await lista();
+    let remotos = listado.libros;
     if (S.porBorrar.length) {
       for (const id of S.porBorrar.slice()) {
         await marcaBorrado(remotos[id]);
         S.porBorrar = S.porBorrar.filter((x) => x !== id);
         guardaS();
       }
-      remotos = await lista();
+      listado = await lista();
+      remotos = listado.libros;
     }
 
     const cambiados = [];
@@ -332,7 +349,11 @@
       }
     }
 
-    if (cambiados.length) emite('cambio', cambiados);
+    // las colecciones y las marcas, con los libros ya al día (si alguno ha
+    // llegado o ha cambiado de id, se mezcla aunque nada más haya cambiado)
+    const o = await ponOrden(listado.orden, remotos, cambiados.length > 0);
+    if (o) cambiados.push(...o.libros);
+    if (cambiados.length || (o && o.colecciones)) emite('cambio', cambiados);
   }
 
   /** Sube un libro de aquí (o lo que le falte en Drive). Los que no tienen
@@ -395,6 +416,110 @@
     if (r.archivo) await borra(r.archivo.id);
   }
 
+  /* ------------------------------------------- colecciones y marcas */
+
+  const VACIO = { colecciones: {}, quitadas: {}, libros: {} };
+
+  /** De dos versiones de una cosa, la más reciente (la primera si empatan). */
+  const reciente = (a, b, hora) => (!a ? b : !b ? a : hora(b) > hora(a) ? b : a);
+
+  /** Dos listas de quitados { id: hora }: la hora más reciente de cada uno. */
+  function juntaQuitadas(a, b) {
+    const r = Object.assign({}, a);
+    for (const [id, t] of Object.entries(b || {})) r[id] = Math.max(r[id] || 0, t);
+    return r;
+  }
+
+  /** Dos mapas { id: cosa }: la versión más reciente de cada una, sin las
+   *  que se quitaron después de su último cambio. */
+  function juntaCosas(a, b, quitadas, hora) {
+    const r = {};
+    for (const id of new Set([...Object.keys(a || {}), ...Object.keys(b || {})])) {
+      const x = reciente((a || {})[id], (b || {})[id], hora);
+      if ((quitadas[id] || 0) < hora(x)) r[id] = x;
+    }
+    return r;
+  }
+
+  /** La mezcla de dos archivos de orden, el de aquí y el de Drive: cada
+   *  colección, cada marca y cada «este libro está (o no) en esta
+   *  colección», en su versión más reciente. */
+  function mezcla(a, b) {
+    const r = { v: 1, quitadas: juntaQuitadas(a.quitadas, b.quitadas), libros: {} };
+    r.colecciones = juntaCosas(a.colecciones, b.colecciones, r.quitadas, (c) => c.cambiado || c.creada || 0);
+    for (const id of new Set([...Object.keys(a.libros || {}), ...Object.keys(b.libros || {})])) {
+      const la = (a.libros || {})[id] || {};
+      const lb = (b.libros || {})[id] || {};
+      const quitadas = juntaQuitadas(la.quitadas, lb.quitadas);
+      const en = {};
+      for (const c of new Set([...Object.keys(la.en || {}), ...Object.keys(lb.en || {})])) {
+        en[c] = reciente((la.en || {})[c], (lb.en || {})[c], (e) => e[1] || 0);
+        // de las colecciones quitadas no hace falta saber quién estaba
+        if (r.quitadas[c] && !r.colecciones[c]) delete en[c];
+      }
+      r.libros[id] = { marcas: juntaCosas(la.marcas, lb.marcas, quitadas, (m) => m.cambiado || m.hecho || 0),
+        quitadas: quitadas, en: en };
+    }
+    return r;
+  }
+
+  /** Pone al día las colecciones y las marcas: si el archivo de Drive ha
+   *  cambiado o aquí hay algo nuevo (o si se pide), se bajan, se mezclan con
+   *  las de aquí, y cada lado se queda con la mezcla. Devuelve lo que ha
+   *  cambiado aquí (Biblioteca.aplicaOrden), o nada. */
+  async function ponOrden(f, remotos, forzar) {
+    const visto = f ? String((f.appProperties || {}).cambiado || '') : '';
+    if (!forzar && visto === S.ordenVisto && !S.ordenPendiente) return null;
+    S.ordenPendiente = false;   // lo que cambie aquí desde ahora, para la próxima
+    try {
+      const aqui = await Biblioteca.orden();
+      const alla = f ? JSON.parse(await (await baja(f.id)).text()) : VACIO;
+      const m = mezcla(aqui, alla);
+      // de los libros quitados «de todos» ya no hay nada que guardar
+      for (const id of Object.keys(m.libros)) {
+        const r = remotos[id];
+        if (r && r.ficha && (r.ficha.appProperties || {}).borrado) delete m.libros[id];
+      }
+      const hecho = await Biblioteca.aplicaOrden(m);
+      const nada = !Object.keys(m.colecciones).length && !Object.keys(m.quitadas).length
+        && !Object.keys(m.libros).length;
+      if ((f || !nada) && Biblioteca.canon(m) !== Biblioteca.canon(alla)) {
+        const t = String(Date.now());
+        const blob = new Blob([JSON.stringify(m)], { type: 'application/json' });
+        if (f) {
+          // primero el contenido y luego la hora: quien vea la hora nueva
+          // encuentra ya lo nuevo
+          await drive('PATCH', SUBE + '/files/' + f.id + '?uploadType=media', blob, 'application/json');
+          await cambiaProps(f.id, { cambiado: t });
+        } else {
+          await sube('biblioteca.json', { tipo: 'orden', cambiado: t }, blob, 'application/json');
+        }
+        S.ordenVisto = t;
+      } else {
+        S.ordenVisto = visto;
+      }
+      guardaS();
+      return hecho;
+    } catch (e) {
+      S.ordenPendiente = true;
+      guardaS();
+      throw e;
+    }
+  }
+
+  /* Lo que se ordena o se apunta aquí se manda al poco; sin red o sin
+   * permiso, la próxima vez que se sincronice. */
+  let _orden = 0;
+  function mandaOrden() {
+    clearTimeout(_orden);
+    _orden = setTimeout(sincroniza, 5000);
+  }
+  window.addEventListener('lector-orden', () => {
+    S.ordenPendiente = true;
+    guardaS();
+    if (S.conectada) mandaOrden();
+  });
+
   /* --------------------------------------------- la posición al leer */
 
   const pendientes = new Set();
@@ -434,8 +559,10 @@
 
   document.addEventListener('visibilitychange', () => {
     if (!S.conectada) return;
-    if (document.visibilityState === 'hidden') envia();
-    else if (Date.now() - S.ultima > 2 * 60000) sincroniza();
+    if (document.visibilityState === 'hidden') {
+      envia();
+      if (S.ordenPendiente) sincroniza();
+    } else if (Date.now() - S.ultima > 2 * 60000) sincroniza();
   });
   window.addEventListener('pagehide', () => { if (S.conectada) envia(); });
   window.addEventListener('online', () => { if (S.conectada) sincroniza(); });
@@ -470,6 +597,7 @@
     const t = token();
     S.conectada = false;
     S.ultima = 0;
+    S.ordenVisto = '';
     guardaS();
     olvidaPermiso();
     pendientes.clear();
@@ -494,10 +622,11 @@
       return;
     }
     S.porBorrar.push(l.id);
+    S.ordenPendiente = true;   // sus marcas ya no hacen falta en Drive
     guardaS();
     if (!token()) return;
     try {
-      const r = (await lista())[l.id];
+      const r = (await lista()).libros[l.id];
       await marcaBorrado(r);
       S.porBorrar = S.porBorrar.filter((x) => x !== l.id);
       guardaS();

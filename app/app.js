@@ -1,8 +1,10 @@
 /* Lector: la biblioteca, la vista de lectura y los ajustes.
  *
  * Tres vistas, por la dirección:
- *  · #/            la biblioteca, y abrir un libro nuevo
- *  · #/libro/<id>  el libro: su texto por tramos, su índice y la voz
+ *  · #/            la biblioteca, sus colecciones, y abrir un libro nuevo
+ *  · #/coleccion/<id>  una colección: las de dentro y sus libros
+ *  · #/libro/<id>  el libro: su texto por tramos, su índice, sus marcadores
+ *                  y notas, y la voz
  *  · #/ajustes     las voces de cada lengua, la velocidad y la
  *                  sincronización con Google Drive (nube.js)
  *
@@ -57,7 +59,15 @@
       + '<path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/>',
     onda: '<path d="M4 10v4M8 7v10M12 4v16M16 8v8M20 11v2"/>',
     toca: '<path d="M9 11V5.5a1.5 1.5 0 0 1 3 0V11m0-1.5a1.5 1.5 0 0 1 3 0V11m0-.5a1.5 1.5 0 0 1 3 0V15a6 6 0 0 1-6 6h-.8'
-      + 'a6 6 0 0 1-4.6-2.2L4.3 15.6a1.6 1.6 0 0 1 2.4-2.1L9 15.5"/>'
+      + 'a6 6 0 0 1-4.6-2.2L4.3 15.6a1.6 1.6 0 0 1 2.4-2.1L9 15.5"/>',
+    marcador: '<path d="M7 3.5h10a1 1 0 0 1 1 1V20.5l-6-4.3-6 4.3V4.5a1 1 0 0 1 1-1z"/>',
+    marcado: '<path class="lleno" d="M7 2.5h10a2 2 0 0 1 2 2v16a1 1 0 0 1-1.6.8L12 17.4l-5.4 3.9A1 1 0 0 1 5 20.5v-16a2 2 0 0 1 2-2z"/>',
+    lapiz: '<path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17z"/><path d="M13.5 8.5l2 2"/>',
+    carpeta: '<path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H9l2 2.5h8.5A1.5 1.5 0 0 1 21 10v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18z"/>',
+    saca: '<path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H9l2 2.5h8.5A1.5 1.5 0 0 1 21 10v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18z"/>'
+      + '<path d="M9 14h6"/>',
+    puntos: '<circle class="lleno" cx="5.5" cy="12" r="1.7"/><circle class="lleno" cx="12" cy="12" r="1.7"/>'
+      + '<circle class="lleno" cx="18.5" cy="12" r="1.7"/>'
   };
   const ico = (n) => '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false">'
     + ICONOS[n] + '</svg>';
@@ -79,6 +89,9 @@
   /* Un tramo no pasa de estos párrafos: si un capítulo es más largo, se
    * parte por sus secciones, y si no las tiene, a pedazos de esta medida. */
   const TRAMO = 500;
+
+  /* Los archivos que se pueden abrir como libro. */
+  const ACEPTA = '.epub,.txt,.md,application/epub+zip,text/plain,text/markdown';
 
   /* ------------------------------------------------------------ ajustes */
 
@@ -196,7 +209,9 @@
     hay: {},         // voz -> está bajada
     urls: [],        // portadas pintadas, para soltarlas
     sueno: null,     // el temporizador: { hasta } (una hora) o { parrafo } (fin del capítulo)
-    ro: null         // el que mira el tamaño de la hoja, en páginas
+    ro: null,        // el que mira el tamaño de la hoja, en páginas
+    pestana: '',     // la pestaña del índice que se vio la última vez
+    elegido: null    // el trozo del texto seleccionado (un Range), para una nota
   };
 
   /* Las páginas del tramo pintado (sólo leyendo por páginas): cuántas son,
@@ -352,6 +367,7 @@
     const [a, b] = h.split('/');
     if (a === 'libro' && b) return { vista: 'libro', id: decodeURIComponent(b) };
     if (a === 'ajustes') return { vista: 'ajustes' };
+    if (a === 'coleccion' && b) return { vista: 'biblioteca', coleccion: decodeURIComponent(b) };
     return { vista: 'biblioteca' };
   }
 
@@ -364,11 +380,11 @@
     colorBarra();
     if (L.ro) { L.ro.disconnect(); L.ro = null; }
     document.querySelectorAll('dialog[open]').forEach((d) => d.close());
-    if (window.CSS && CSS.highlights) CSS.highlights.delete('suena');
+    if (window.CSS && CSS.highlights) { CSS.highlights.delete('suena'); CSS.highlights.delete('notas'); }
     try {
       if (r.vista === 'libro') await pintaLibro(r.id);
       else if (r.vista === 'ajustes') pintaAjustes();
-      else await pintaBiblioteca();
+      else await pintaBiblioteca(r.coleccion);
     } catch (err) {
       console.error(err);
       vista.innerHTML = '<main><p class="mal">' + esc(err.message || err) + '</p>'
@@ -380,26 +396,16 @@
 
   /* --------------------------------------------------------- biblioteca */
 
-  async function pintaBiblioteca() {
+  /** La biblioteca, o una colección (`cid`): sus colecciones, como
+   *  carpetas, y sus libros. */
+  async function pintaBiblioteca(cid) {
     L.urls.forEach((u) => URL.revokeObjectURL(u));
     L.urls = [];
-    const libros = await Biblioteca.libros();
+    const [libros, cols] = await Promise.all([Biblioteca.libros(), Biblioteca.colecciones()]);
+    const col = cid ? cols.find((c) => c.id === cid) : null;
+    if (cid && !col) { location.replace('#/'); return; }
     const est = Voz.estado().estado;
     const suena = L.sonando && est !== 'parada' ? L.sonando.libro.id : null;
-    /** La tapa: la portada del libro, o una de tela con su título en oro. */
-    const tapaDe = (l, chapa) => {
-      if (l.portada) {
-        const u = URL.createObjectURL(l.portada);
-        L.urls.push(u);
-        return '<div class="tapa"><img src="' + u + '" alt="">' + (chapa || '') + '</div>';
-      }
-      const t = telaDe(l.titulo);
-      return '<div class="tapa hecha" style="--tela:' + t[0] + ';--dorado:' + t[1] + '">'
-        + '<span class="t-titulo" aria-hidden="true">' + esc(l.titulo) + '</span>'
-        + '<span class="t-orla"></span>'
-        + (l.autor ? '<span class="t-autor" aria-hidden="true">' + esc(l.autor) + '</span>' : '')
-        + (chapa || '') + '</div>';
-    };
     const ondas = '<span class="ondas" aria-hidden="true"><i></i><i></i><i></i></span>';
     const enVoz = est === 'pausada' ? 'En pausa' : 'Sonando';
     /** Por dónde va un libro: el tanto por ciento, la página y el capítulo. */
@@ -411,7 +417,7 @@
     };
     const barra = (pct) => '<div class="barra" role="progressbar" aria-label="Leído" aria-valuemin="0" '
       + 'aria-valuemax="100" aria-valuenow="' + pct + '"><div style="width:' + pct + '%"></div></div>';
-    const fichas = libros.map((l) => {
+    const ficha = (l) => {
       const d = donde(l);
       const vivo = suena === l.id;
       return '<li class="ficha">'
@@ -423,70 +429,410 @@
         + '</a><div class="ficha-pie">'
         + (d.pos ? barra(d.pct) + '<span class="ficha-pct">' + d.pct + ' %</span>'
           : '<span class="ficha-pct nuevo">Sin empezar</span>')
-        + '<button type="button" class="quita icono" data-id="' + esc(l.id) + '" aria-label="Quitar «'
-        + esc(l.titulo) + '»" title="Quitar">' + ico('quita') + '</button></div></li>';
-    });
-    // el último que se abrió, en grande, para seguir con un toque
-    const ult = libros.find((l) => l.abierto);
-    let seguir = '';
-    if (ult) {
-      const d = donde(ult);
-      const vivo = suena === ult.id;
-      seguir = '<a class="seguir" href="#/libro/' + encodeURIComponent(ult.id) + '">'
-        + tapaDe(ult)
-        + '<div class="datos"><span class="rotulo">' + (vivo ? ondas + enVoz : 'Seguir leyendo') + '</span>'
-        + '<b>' + esc(ult.titulo) + '</b>'
-        + (ult.autor ? '<p class="nota autor">' + esc(ult.autor) + '</p>' : '')
-        + (d.e ? '<span class="donde">' + esc(d.e.t) + '</span>' : '')
-        + '<div class="pie">' + barra(d.pct) + '<span>' + d.pct + ' %'
-        + (d.pag ? ' · ' + esc(d.pag) : '') + '</span></div>'
-        + '<span class="boton principal">' + ico('play') + 'Seguir</span></div></a>';
-    }
-    const h = new Date().getHours();
-    const saludo = h >= 6 && h < 13 ? 'Buenos días' : h >= 13 && h < 21 ? 'Buenas tardes' : 'Buenas noches';
-    const abrir = '<input type="file" id="archivo" hidden '
-      + 'accept=".epub,.txt,.md,application/epub+zip,text/plain,text/markdown">';
-    vista.innerHTML = '<main class="biblioteca">'
-      + '<header class="portadilla"><div class="marca">' + SELLO + '<div><h1>Lector</h1>'
-      + '<p class="sub">' + (libros.length ? saludo + '. ¿Qué leemos hoy?' : 'Libros en voz alta, sin conexión.')
-      + '</p></div></div>'
-      + '<a class="boton icono" href="#/ajustes" aria-label="Ajustes" title="Ajustes">' + ico('ajustes') + '</a></header>'
-      + seguir
-      + '<div id="nube" class="nube" hidden></div>'
-      + (fichas.length
-        ? '<div class="estante-cabeza"><h2 class="biblio-titulo">Biblioteca <span>' + libros.length + '</span></h2>'
-          + '<label class="boton" tabindex="0">' + ico('mas') + 'Añadir libro' + abrir + '</label></div>'
-          + '<p class="nota" id="importa-estado">' + esc(textoImporta()) + '</p>'
-          + '<ul class="estante">' + fichas.join('') + '</ul>'
-        : '<section class="vacio">' + SELLO + '<h2>Tu biblioteca está vacía</h2>'
-          + '<p>Abre un EPUB o un TXT: se guarda aquí, con su índice, y se puede escuchar '
-          + 'sin conexión desde cualquier párrafo.</p>'
-          + '<label class="boton principal" tabindex="0">' + ico('mas') + 'Abrir un libro' + abrir + '</label>'
-          + '<p class="nota" id="importa-estado">' + esc(textoImporta()) + '</p></section>')
-      + '</main>';
+        + '<button type="button" class="mas icono" data-id="' + esc(l.id) + '" aria-label="Más de «'
+        + esc(l.titulo) + '»: colecciones, quitar" title="Colecciones, quitar…">' + ico('puntos')
+        + '</button></div></li>';
+    };
+    /** Una colección: los últimos libros que se abrieron de dentro, en
+     *  abanico, su nombre y cuánto lleva. */
+    const carpeta = (c) => {
+      const dentro = rama(cols, c.id);
+      const suyos = libros.filter((l) => (l.colecciones || []).some((x) => dentro.has(x)));
+      const subs = hijas(cols, c.id).length;
+      const cuenta = [suyos.length ? suyos.length + (suyos.length === 1 ? ' libro' : ' libros') : '',
+        subs ? subs + (subs === 1 ? ' colección' : ' colecciones') : ''].filter(Boolean).join(' · ');
+      return '<li><a class="carpeta" href="#/coleccion/' + encodeURIComponent(c.id) + '">'
+        + '<span class="abanico" aria-hidden="true">' + (suyos.length
+          ? suyos.slice(0, 3).reverse().map((l) => tapaDe(l)).join('') : ico('carpeta')) + '</span>'
+        + '<span class="carpeta-datos"><b>' + esc(c.nombre) + '</b><small>' + (cuenta || 'Vacía')
+        + '</small></span></a></li>';
+    };
+    const nueva = '<li><button type="button" class="carpeta nueva" id="b-nueva"><span class="abanico" '
+      + 'aria-hidden="true">' + ico('mas') + '</span><span class="carpeta-datos"><b>'
+      + (col ? 'Nueva subcolección' : 'Nueva colección') + '</b><small>'
+      + (col ? 'Dentro de «' + esc(col.nombre) + '»' : 'Ordena tus libros en carpetas')
+      + '</small></span></button></li>';
+    const abrir = '<input type="file" id="archivo" hidden accept="' + ACEPTA + '">';
+    const estado = '<p class="nota" id="importa-estado">' + esc(textoImporta()) + '</p>';
 
-    pintaNube();
+    if (col) {
+      const suyos = libros.filter((l) => (l.colecciones || []).includes(col.id));
+      const arriba = ancestros(cols, col.id);
+      vista.innerHTML = '<main class="biblioteca">'
+        + '<header class="portadilla vuelta coleccion"><a class="boton icono" href="'
+        + (arriba.length ? '#/coleccion/' + encodeURIComponent(arriba[arriba.length - 1].id) : '#/')
+        + '" aria-label="Volver" title="Volver">' + ico('atras') + '</a>'
+        + '<div class="titulos"><nav class="migas" aria-label="Dónde estás"><a href="#/">Biblioteca</a>'
+        + arriba.map((c) => '<span aria-hidden="true">›</span><a href="#/coleccion/'
+          + encodeURIComponent(c.id) + '">' + esc(c.nombre) + '</a>').join('')
+        + '</nav><h1>' + esc(col.nombre) + '</h1></div>'
+        + '<button type="button" class="boton icono" id="b-coleccion" aria-label="Más de la colección: '
+        + 'nombre, mover, quitar" title="Nombre, mover, quitar…">' + ico('puntos') + '</button></header>'
+        + '<ul class="carpetas">' + hijas(cols, col.id).map(carpeta).join('') + nueva + '</ul>'
+        + '<div class="estante-cabeza"><h2 class="biblio-titulo">Libros <span>' + suyos.length + '</span></h2>'
+        + '<button type="button" class="boton" id="b-meter">' + ico('mas') + 'Añadir libros</button>'
+        + abrir + '</div>'
+        + estado
+        + (suyos.length ? '<ul class="estante">' + suyos.map(ficha).join('') + '</ul>'
+          : '<p class="vacio-coleccion">' + ico('libro') + '<span>Todavía no hay libros aquí. Toca '
+            + '<b>Añadir libros</b> para traerlos de tu biblioteca o abrir uno nuevo.</span></p>')
+        + '</main>';
+    } else {
+      // el último que se abrió, en grande, para seguir con un toque
+      const ult = libros.find((l) => l.abierto);
+      let seguir = '';
+      if (ult) {
+        const d = donde(ult);
+        const vivo = suena === ult.id;
+        seguir = '<a class="seguir" href="#/libro/' + encodeURIComponent(ult.id) + '">'
+          + tapaDe(ult)
+          + '<div class="datos"><span class="rotulo">' + (vivo ? ondas + enVoz : 'Seguir leyendo') + '</span>'
+          + '<b>' + esc(ult.titulo) + '</b>'
+          + (ult.autor ? '<p class="nota autor">' + esc(ult.autor) + '</p>' : '')
+          + (d.e ? '<span class="donde">' + esc(d.e.t) + '</span>' : '')
+          + '<div class="pie">' + barra(d.pct) + '<span>' + d.pct + ' %'
+          + (d.pag ? ' · ' + esc(d.pag) : '') + '</span></div>'
+          + '<span class="boton principal">' + ico('play') + 'Seguir</span></div></a>';
+      }
+      const raiz = hijas(cols, '');
+      const h = new Date().getHours();
+      const saludo = h >= 6 && h < 13 ? 'Buenos días' : h >= 13 && h < 21 ? 'Buenas tardes' : 'Buenas noches';
+      vista.innerHTML = '<main class="biblioteca">'
+        + '<header class="portadilla"><div class="marca">' + SELLO + '<div><h1>Lector</h1>'
+        + '<p class="sub">' + (libros.length ? saludo + '. ¿Qué leemos hoy?' : 'Libros en voz alta, sin conexión.')
+        + '</p></div></div>'
+        + '<a class="boton icono" href="#/ajustes" aria-label="Ajustes" title="Ajustes">' + ico('ajustes') + '</a></header>'
+        + seguir
+        + '<div id="nube" class="nube" hidden></div>'
+        + (libros.length || raiz.length
+          ? '<div class="estante-cabeza"><h2 class="biblio-titulo">Colecciones'
+            + (raiz.length ? ' <span>' + raiz.length + '</span>' : '') + '</h2></div>'
+            + '<ul class="carpetas">' + raiz.map(carpeta).join('') + nueva + '</ul>'
+          : '')
+        + (libros.length
+          ? '<div class="estante-cabeza"><h2 class="biblio-titulo">Biblioteca <span>' + libros.length + '</span></h2>'
+            + '<label class="boton" tabindex="0">' + ico('mas') + 'Añadir libro' + abrir + '</label></div>'
+            + estado
+            + '<ul class="estante">' + libros.map(ficha).join('') + '</ul>'
+          : '<section class="vacio">' + SELLO + '<h2>Tu biblioteca está vacía</h2>'
+            + '<p>Abre un EPUB o un TXT: se guarda aquí, con su índice, y se puede escuchar '
+            + 'sin conexión desde cualquier párrafo.</p>'
+            + '<label class="boton principal" tabindex="0">' + ico('mas') + 'Abrir un libro' + abrir + '</label>'
+            + estado + '</section>')
+        + '</main>';
+      pintaNube();
+    }
+
     sinPaginas(libros);
-    $('#archivo').addEventListener('change', (ev) => {
+    const arch = $('#archivo');
+    arch.addEventListener('change', (ev) => {
       const f = ev.target.files && ev.target.files[0];
       ev.target.value = '';
-      if (f) importa(f);
+      if (f) importa(f, cid);
     });
     // con el teclado, la etiqueta abre el archivo como un botón
-    $('#archivo').parentElement.addEventListener('keydown', (ev) => {
-      if (ev.key !== 'Enter' && ev.key !== ' ') return;
-      ev.preventDefault();
-      $('#archivo').click();
+    if (arch.parentElement.tagName === 'LABEL') {
+      arch.parentElement.addEventListener('keydown', (ev) => {
+        if (ev.key !== 'Enter' && ev.key !== ' ') return;
+        ev.preventDefault();
+        arch.click();
+      });
+    }
+    const bn = $('#b-nueva');
+    if (bn) bn.addEventListener('click', async () => {
+      // la nueva se abre, para meterle libros enseguida
+      const c = await nuevaColeccion(col);
+      if (c) location.hash = '#/coleccion/' + encodeURIComponent(c.id);
     });
-    vista.querySelectorAll('.quita').forEach((b) => b.addEventListener('click', async () => {
+    vista.querySelectorAll('.ficha .mas').forEach((b) => b.addEventListener('click', () => {
       const l = libros.find((x) => x.id === b.dataset.id);
-      if (!l) return;
+      if (l) accionesLibro(l, col);
+    }));
+    const bc = $('#b-coleccion');
+    if (bc) bc.addEventListener('click', () => accionesColeccion(col));
+    const bm = $('#b-meter');
+    if (bm) bm.addEventListener('click', async () => {
+      if (!libros.length) { arch.click(); return; }
+      const f = await eligeLibros(col, libros);
+      await pinta();
+      if (f) importa(f, col.id);
+    });
+  }
+
+  /** La tapa: la portada del libro, o una de tela con su título en oro. */
+  function tapaDe(l, chapa) {
+    if (l.portada) {
+      const u = URL.createObjectURL(l.portada);
+      L.urls.push(u);
+      return '<div class="tapa"><img src="' + u + '" alt="">' + (chapa || '') + '</div>';
+    }
+    const t = telaDe(l.titulo);
+    return '<div class="tapa hecha" style="--tela:' + t[0] + ';--dorado:' + t[1] + '">'
+      + '<span class="t-titulo" aria-hidden="true">' + esc(l.titulo) + '</span>'
+      + '<span class="t-orla"></span>'
+      + (l.autor ? '<span class="t-autor" aria-hidden="true">' + esc(l.autor) + '</span>' : '')
+      + (chapa || '') + '</div>';
+  }
+
+  /* -------------------------------------------------------- colecciones */
+
+  /** La colección de encima de `c`: '' si está arriba del todo (o si la
+   *  suya ya no existe). */
+  const padreDe = (cols, c) => (c.padre && cols.some((x) => x.id === c.padre) ? c.padre : '');
+
+  /** Las que hay dentro de `padre` ('' para las de arriba), por su nombre. */
+  const hijas = (cols, padre) => cols.filter((c) => padreDe(cols, c) === (padre || ''))
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { numeric: true, sensitivity: 'base' }));
+
+  /** Una colección y todas las de dentro, a cualquier hondura. */
+  function rama(cols, id) {
+    const r = new Set([id]);
+    let mas = true;
+    while (mas) {
+      mas = false;
+      for (const c of cols) {
+        if (!r.has(c.id) && r.has(padreDe(cols, c))) { r.add(c.id); mas = true; }
+      }
+    }
+    return r;
+  }
+
+  /** Las de encima de una, de la de más arriba a la suya (sin ella). */
+  function ancestros(cols, id) {
+    const r = [];
+    let c = cols.find((x) => x.id === id);
+    while (c && padreDe(cols, c) && r.length < cols.length) {
+      c = cols.find((x) => x.id === padreDe(cols, c));
+      r.unshift(c);
+    }
+    return r;
+  }
+
+  /** Todas, en árbol y en orden, con su hondura; sin las de `fuera` (ni
+   *  las de dentro de ellas). */
+  function arbol(cols, fuera) {
+    const r = [];
+    const baja = (padre, nivel) => hijas(cols, padre).forEach((c) => {
+      if (fuera && fuera.has(c.id)) return;
+      r.push({ c: c, nivel: nivel });
+      baja(c.id, nivel + 1);
+    });
+    baja('', 0);
+    return r;
+  }
+
+  /** Pide un nombre, para una colección nueva o para cambiárselo.
+   *  Devuelve el nombre, o nada si se cancela. */
+  function pideNombre(titulo, nota, valor) {
+    const d = $('#d-nombre');
+    $('#dno-titulo').textContent = titulo;
+    $('#dno-nota').textContent = nota || '';
+    $('#dno-nota').hidden = !nota;
+    const i = $('#dno-nombre');
+    i.value = valor || '';
+    d.returnValue = '';
+    d.showModal();
+    i.select();
+    return new Promise((res) => {
+      d.onclose = () => res(d.returnValue === 'guarda' ? i.value.trim() : '');
+    });
+  }
+
+  /** Una colección nueva dentro de `padre` (o arriba del todo). */
+  async function nuevaColeccion(padre) {
+    const nombre = await pideNombre(padre ? 'Nueva subcolección' : 'Nueva colección',
+      padre ? 'Dentro de «' + padre.nombre + '».' : '', '');
+    return nombre ? Biblioteca.nuevaColeccion(nombre, padre ? padre.id : '') : null;
+  }
+
+  /** El menú que sube de abajo: devuelve la acción elegida, o nada. */
+  function acciones(titulo, lista) {
+    const d = $('#d-acciones');
+    const ul = $('#acciones-lista');
+    $('#dac-titulo').textContent = titulo;
+    ul.innerHTML = lista.map((a) => '<li><button type="button" data-v="' + a.v + '"'
+      + (a.peligro ? ' class="peligro"' : '') + '>' + ico(a.ico) + '<span>' + esc(a.t) + '</span></button></li>')
+      .join('');
+    let v = '';
+    ul.onclick = (ev) => {
+      const b = ev.target.closest('button[data-v]');
+      if (!b) return;
+      v = b.dataset.v;
+      d.close();
+    };
+    d.showModal();
+    return new Promise((res) => { d.onclose = () => res(v); });
+  }
+
+  /** Lo que se puede hacer con un libro desde la biblioteca. */
+  async function accionesLibro(l, col) {
+    const ops = [{ v: 'colecciones', ico: 'carpeta', t: 'Guardar en colecciones…' }];
+    if (col && (l.colecciones || []).includes(col.id)) {
+      ops.push({ v: 'saca', ico: 'saca', t: 'Sacar de «' + col.nombre + '»' });
+    }
+    ops.push({ v: 'quita', ico: 'quita', t: 'Quitar de la biblioteca', peligro: true });
+    const v = await acciones(l.titulo, ops);
+    if (v === 'colecciones') {
+      await eligeColecciones(l);
+      pinta();
+    } else if (v === 'saca') {
+      await Biblioteca.ponColecciones(l.id, (l.colecciones || []).filter((x) => x !== col.id));
+      pinta();
+    } else if (v === 'quita') {
       const como = await preguntaQuitar(l);
       if (!como) return;
       if (L.sonando && L.sonando.libro.id === l.id) { Voz.para(); L.sonando = null; }
       await Nube.quita(l, como === 'todos');
       pinta();
-    }));
+    }
+  }
+
+  /** Lo que se puede hacer con una colección, desde dentro de ella. */
+  async function accionesColeccion(col) {
+    const v = await acciones(col.nombre, [
+      { v: 'nombre', ico: 'lapiz', t: 'Cambiar el nombre' },
+      { v: 'mueve', ico: 'carpeta', t: 'Mover a otra colección' },
+      { v: 'quita', ico: 'quita', t: 'Quitar la colección', peligro: true }]);
+    if (v === 'nombre') {
+      const n = await pideNombre('Cambiar el nombre', '', col.nombre);
+      if (!n || n === col.nombre) return;
+      await Biblioteca.guardaColeccion(Object.assign({}, col, { nombre: n }));
+      pinta();
+    } else if (v === 'mueve') {
+      const dest = await eligeDestino(col);
+      if (dest === null || dest === (col.padre || '')) return;
+      await Biblioteca.guardaColeccion(Object.assign({}, col, { padre: dest }));
+      pinta();
+    } else if (v === 'quita') {
+      const cols = await Biblioteca.colecciones();
+      const r = rama(cols, col.id);
+      const n = r.size - 1;
+      if (!confirm('¿Quitar la colección «' + col.nombre + '»'
+        + (n ? (n === 1 ? ' y la que tiene dentro' : ' y las ' + n + ' que tiene dentro') : '')
+        + '? Los libros no se borran: siguen en la biblioteca.')) return;
+      const padre = padreDe(cols, col);
+      await Biblioteca.quitaColecciones(Array.from(r));
+      location.hash = padre ? '#/coleccion/' + encodeURIComponent(padre) : '#/';
+    }
+  }
+
+  /** La hoja de elegir, con su título, la lista y lo de abajo. Se cumple
+   *  al cerrarla. */
+  function abreElige(titulo, sub, lista, pie) {
+    const d = $('#d-elige');
+    $('#de-titulo').textContent = titulo;
+    $('#de-sub').textContent = sub || '';
+    $('#de-sub').hidden = !sub;
+    $('#de-lista').innerHTML = lista;
+    $('#de-lista').onchange = null;
+    $('#de-lista').onclick = null;
+    $('#de-pie').innerHTML = pie || '';
+    d.showModal();
+    return new Promise((res) => { d.onclose = () => res(); });
+  }
+
+  /** En qué colecciones está un libro: casillas, en árbol. Cada cambio se
+   *  guarda en el momento. */
+  async function eligeColecciones(l) {
+    const si = new Set(l.colecciones || []);
+    let cols = await Biblioteca.colecciones();
+    const lista = () => {
+      const a = arbol(cols);
+      return a.length ? a.map((x) => '<li style="--nivel:' + x.nivel + '"><label class="casilla">'
+        + '<input type="checkbox" value="' + esc(x.c.id) + '"' + (si.has(x.c.id) ? ' checked' : '') + '>'
+        + ico('carpeta') + '<span>' + esc(x.c.nombre) + '</span></label></li>').join('')
+        : '<li class="nada">Todavía no hay ninguna colección. Crea la primera aquí abajo.</li>';
+    };
+    const listo = abreElige('Guardar en colecciones', l.titulo, lista(),
+      '<button type="button" id="de-nueva">' + ico('mas') + 'Nueva colección</button>'
+      + '<button type="button" class="principal" id="de-hecho">Hecho</button>');
+    const ul = $('#de-lista');
+    const guarda = () => {
+      l.colecciones = Array.from(si).filter((x) => cols.some((c) => c.id === x));
+      return Biblioteca.ponColecciones(l.id, l.colecciones);
+    };
+    ul.onchange = (ev) => {
+      const i = ev.target;
+      if (i.type !== 'checkbox') return;
+      if (i.checked) si.add(i.value);
+      else si.delete(i.value);
+      guarda().catch((err) => alert('No se pudo guardar: ' + (err.message || err)));
+    };
+    $('#de-nueva').onclick = async () => {
+      const c = await nuevaColeccion(null);
+      if (!c) return;
+      cols = await Biblioteca.colecciones();
+      si.add(c.id);
+      await guarda();
+      ul.innerHTML = lista();
+    };
+    $('#de-hecho').onclick = () => $('#d-elige').close();
+    return listo;
+  }
+
+  /** Adónde mover una colección: arriba del todo, o dentro de otra que no
+   *  sea ella ni ninguna de las suyas. Devuelve el id ('' arriba), o null. */
+  async function eligeDestino(col) {
+    const cols = await Biblioteca.colecciones();
+    const ahora = padreDe(cols, col);
+    const op = [{ id: '', t: 'Biblioteca (arriba del todo)', nivel: 0, icono: 'libro' }]
+      .concat(arbol(cols, rama(cols, col.id)).map((x) => ({ id: x.c.id, t: x.c.nombre, nivel: x.nivel + 1,
+        icono: 'carpeta' })));
+    let v = null;
+    const listo = abreElige('Mover «' + col.nombre + '»', 'Elige dónde ponerla, con todo lo que lleva dentro.',
+      op.map((x) => '<li style="--nivel:' + x.nivel + '"><button type="button" class="destino" data-id="'
+        + esc(x.id) + '"' + (x.id === ahora ? ' aria-current="true"' : '') + '>' + ico(x.icono)
+        + '<span>' + esc(x.t) + '</span>' + (x.id === ahora ? '<small>Está aquí</small>' : '')
+        + '</button></li>').join(''));
+    $('#de-lista').onclick = (ev) => {
+      const b = ev.target.closest('button[data-id]');
+      if (!b) return;
+      v = b.dataset.id;
+      $('#d-elige').close();
+    };
+    await listo;
+    return v;
+  }
+
+  /** Qué libros de la biblioteca están en una colección: casillas, que se
+   *  guardan en el momento. Abajo, abrir un libro nuevo para meterlo en
+   *  ella: devuelve su archivo, si se eligió uno. */
+  async function eligeLibros(col, libros) {
+    let archivo = null;
+    const listo = abreElige('Libros en «' + col.nombre + '»', 'Marca los que quieras tener aquí.',
+      libros.map((l) => '<li><label class="casilla con-tapa"><input type="checkbox" value="' + esc(l.id) + '"'
+        + ((l.colecciones || []).includes(col.id) ? ' checked' : '') + '>' + tapaDe(l)
+        + '<span><b>' + esc(l.titulo) + '</b>' + (l.autor ? '<small>' + esc(l.autor) + '</small>' : '')
+        + '</span></label></li>').join(''),
+      '<label class="boton" tabindex="0">' + ico('mas') + 'Abrir un libro nuevo'
+      + '<input type="file" id="de-archivo" hidden accept="' + ACEPTA + '"></label>'
+      + '<button type="button" class="principal" id="de-hecho">Hecho</button>');
+    $('#de-lista').onchange = (ev) => {
+      const i = ev.target;
+      if (i.type !== 'checkbox') return;
+      const l = libros.find((x) => x.id === i.value);
+      if (!l) return;
+      const s = new Set(l.colecciones || []);
+      if (i.checked) s.add(col.id);
+      else s.delete(col.id);
+      l.colecciones = Array.from(s);
+      Biblioteca.ponColecciones(l.id, l.colecciones)
+        .catch((err) => alert('No se pudo guardar: ' + (err.message || err)));
+    };
+    const fi = $('#de-archivo');
+    fi.onchange = () => {
+      archivo = (fi.files && fi.files[0]) || null;
+      fi.value = '';
+      if (archivo) $('#d-elige').close();
+    };
+    fi.parentElement.onkeydown = (ev) => {
+      if (ev.key !== 'Enter' && ev.key !== ' ') return;
+      ev.preventDefault();
+      fi.click();
+    };
+    $('#de-hecho').onclick = () => $('#d-elige').close();
+    await listo;
+    return archivo;
   }
 
   /** Los libros guardados antes de que hubiera páginas las sacan una vez,
@@ -552,7 +898,9 @@
 
   /* ------------------------------------------------------------ importar */
 
-  async function importa(file) {
+  /** Abre un archivo como libro; dentro de una colección (`cid`), lo mete
+   *  en ella. */
+  async function importa(file, cid) {
     const est = $('#importa-estado');
     est.className = 'nota';
     est.textContent = 'Abriendo «' + file.name + '»…';
@@ -575,6 +923,9 @@
     const ya = await Biblioteca.libros();
     const igual = huella && ya.find((l) => l.huella === huella);
     if (igual) {
+      if (cid && !(igual.colecciones || []).includes(cid)) {
+        await Biblioteca.ponColecciones(igual.id, (igual.colecciones || []).concat(cid));
+      }
       location.hash = '#/libro/' + encodeURIComponent(igual.id);
       return;
     }
@@ -613,7 +964,8 @@
         autor: $('#i-autor').value.trim(),
         lengua: sel.value,
         archivo: file.name,
-        huella: huella
+        huella: huella,
+        colecciones: cid ? [cid] : []
       });
       try {
         await Biblioteca.guarda(libro, { t: r.t, h: r.h, k: r.k || {} }, file);
@@ -651,16 +1003,22 @@
       + '<div class="rotulos"><b>' + esc(O.libro.titulo) + '</b>'
       + '<span id="capitulo" class="nota"></span></div>'
       + (O.hayNotas ? '<button type="button" class="boton" id="b-notas"></button>' : '')
-      + '<button type="button" class="boton icono" id="b-indice" aria-label="Índice" title="Índice">'
-      + ico('indice') + '</button>'
+      + '<button type="button" class="boton icono" id="b-marca" aria-pressed="false"></button>'
+      + '<button type="button" class="boton icono" id="b-indice" aria-label="Índice, marcadores y notas" '
+      + 'title="Índice, marcadores y notas">' + ico('indice') + '</button>'
       + '</header>'
       + '<main class="lectura">'
       + '<div id="cornisa" class="cornisa" title="Ver sólo la página, o los mandos"></div>'
       + '<div id="hoja"><article id="texto" class="texto" lang="'
-      + esc(O.libro.lengua || 'es') + '"></article></div>'
+      + esc(O.libro.lengua || 'es') + '"></article>'
+      + '<button type="button" id="marcapaginas" class="marcapaginas" aria-label="Quitar el marcador de esta página" '
+      + 'title="Quitar el marcador" hidden></button></div>'
       + '<div id="folio" class="folio" title="Ver sólo la página, o los mandos"></div></main>'
       + '<button type="button" id="b-sigue" class="boton principal flota" hidden>' + ico('sigue')
       + 'Ir a lo que suena</button>'
+      + '<div id="seleccion" class="seleccion" role="toolbar" aria-label="Con lo seleccionado" hidden>'
+      + '<button type="button" id="b-sel-nota">' + ico('lapiz') + 'Nota</button>'
+      + '<button type="button" id="b-sel-marca">' + ico('marcador') + 'Marcador</button></div>'
       + '<footer class="mandos"><p id="voz-aviso" class="nota" aria-live="polite"></p>'
       + '<div class="avance"><span id="av-pag"></span><div class="cinta">'
       + '<div class="marcas" aria-hidden="true">' + marcas(O) + '</div>'
@@ -679,6 +1037,8 @@
       + '</div></footer>';
 
     $('#b-indice').addEventListener('click', () => abreIndice(O));
+    $('#b-marca').addEventListener('click', () => cambiaMarcador(O));
+    barraSeleccion(O);
     if (O.hayNotas) {
       $('#b-notas').addEventListener('click', () => cambiaNotas(O));
       pintaNotas(O);
@@ -745,6 +1105,7 @@
     }
     if (i < O.tramos.length - 1 && !pag) f.appendChild(botonTramo(O, i + 1, false));
     art.replaceChildren(f);
+    pintaMarcas(O);   // antes de partir en páginas: los lápices de las notas ocupan sitio
     maqueta();
     pintaCapitulo(O, tr.desde);
     if (L.sonando === O && Voz.estado().estado !== 'parada') resalta(O, Voz.estado().i);
@@ -790,6 +1151,8 @@
     if (av && !L.arrastra) { av.value = p; llenaCinta(av); }
     $('#av-pag').textContent = pag.replace(/\/.*$/, '');
     $('#av-pct').textContent = pct + ' %';
+    // por páginas, el marcador se mira al pasar de página (muestra)
+    if (!enPaginas()) pintaMarcador();
   }
 
   /** Lo andado de la cinta del avance, hasta donde está su botón. */
@@ -936,6 +1299,7 @@
     const art = $('#texto');
     if (!art || !enPaginas()) return;
     P.pagina = Math.max(0, Math.min(P.total - 1, n));
+    pintaMarcador();
     const x = -P.pagina * P.paso;
     const desde = P.x;
     cancelAnimationFrame(_desliza);
@@ -1074,6 +1438,10 @@
    *  frase se lee desde ahí (o, sólo con la página, vuelven los mandos). */
   function tocaHoja(O, ev) {
     if (Date.now() < (L.sinClic || 0)) return;
+    // el lápiz de una nota la abre; la cinta del marcador lo quita
+    const lapiz = ev.target.closest('.nota-marca');
+    if (lapiz) { abreNota(O, lapiz.dataset.nota); return; }
+    if (ev.target.closest('#marcapaginas')) { cambiaMarcador(O); return; }
     if (enPaginas()) {
       const r = $('#hoja').getBoundingClientRect();
       const x = (ev.clientX - r.left) / r.width;
@@ -1097,6 +1465,12 @@
     hoja.addEventListener('touchmove', (ev) => {
       if (!t0 || !L.vista) return;
       if (ev.touches.length > 1) { t0 = null; muestra(P.pagina, true); return; }
+      // eligiendo un trozo del texto (para una nota), el dedo no pasa la página
+      if (window.getSelection && !getSelection().isCollapsed) {
+        if (t0.lado) muestra(P.pagina, true);
+        t0 = null;
+        return;
+      }
       const dx = ev.touches[0].clientX - t0.x;
       const dy = ev.touches[0].clientY - t0.y;
       if (!t0.lado) {
@@ -1355,12 +1729,386 @@
       irA(+b.dataset.p, false);
       apuntaVista();
     };
+    // dos pestañas: el índice y los marcadores y notas; se abre en la de
+    // la última vez
+    const pestana = (v) => {
+      L.pestana = v;
+      d.querySelectorAll('[data-pestana]').forEach((b) =>
+        b.setAttribute('aria-selected', b.dataset.pestana === v ? 'true' : 'false'));
+      lista.hidden = v !== 'indice';
+      $('#marcas-lista').hidden = v !== 'marcas';
+    };
+    d.querySelectorAll('[data-pestana]').forEach((b) => { b.onclick = () => pestana(b.dataset.pestana); });
+    pintaListaMarcas(O);
+    pestana(L.pestana === 'marcas' ? 'marcas' : 'indice');
     d.showModal();
     const act = $('.actual', lista);
-    if (act) act.scrollIntoView({ block: 'center' });
+    if (act && !lista.hidden) act.scrollIntoView({ block: 'center' });
   }
 
-  /* ------------------------------------------------------------ las notas */
+  /* ------------------------------------------------ marcadores y notas
+   * Un marcador señala una página: la letra con que empieza ({ p, c }).
+   * Una nota, un trozo del texto, de { p, c } a `fin`, con lo que se quiera
+   * apuntar (o nada: queda subrayado). Van en la ficha del libro (`marcas`)
+   * y se ven en la pestaña «Marcadores y notas» del índice. En el texto, el
+   * trozo de cada nota va subrayado (CSS.highlights, como la frase que
+   * suena) y lleva un lápiz al final de su párrafo, que la abre; la página
+   * marcada, una cinta arriba. No tienen nada que ver con las notas al pie
+   * del libro (`O.k`, «Con notas»). */
+
+  const marcasDe = (O) => O.libro.marcas || (O.libro.marcas = []);
+
+  function guardaMarcas(O) {
+    Biblioteca.ponMarcas(O.libro.id, O.libro.marcas)
+      .catch((err) => aviso('No se pudo guardar: ' + (err.message || err), true));
+  }
+
+  /** Un texto largo, cortado por una palabra y con puntos suspensivos. */
+  function recorta(t, n) {
+    t = String(t || '').replace(/\s+/g, ' ').trim();
+    if (t.length <= n) return t;
+    const c = t.lastIndexOf(' ', n);
+    return t.slice(0, c > n * 0.6 ? c : n) + '…';
+  }
+
+  /** Dónde está una marca: la página y la entrada del índice. */
+  function dondeMarca(O, m) {
+    const e = entradaDe(O, m.p);
+    return [pagina(O.libro.paginas, m.p, m.c).replace(/\/.*$/, ''), e ? e.t : ''].filter(Boolean).join(' · ');
+  }
+
+  /** El texto de un párrafo pintado (su primer hijo), si lo está. */
+  function textoDe(p) {
+    const el = $('#texto [data-i="' + p + '"]');
+    const t = el && el.firstChild;
+    return t && t.nodeType === 3 ? t : null;
+  }
+
+  /** El trozo de una nota en el tramo pintado, como Range (recortado al
+   *  tramo, si empieza antes o acaba después). */
+  function rangoDe(O, m) {
+    const tr = O.tramos[L.tramo];
+    const fin = m.fin || m;
+    if (!tr || fin.p < tr.desde || m.p >= tr.hasta) return null;
+    const a = m.p < tr.desde ? { p: tr.desde, c: 0 } : m;
+    const b = fin.p >= tr.hasta ? { p: tr.hasta - 1, c: O.t[tr.hasta - 1].length } : fin;
+    const n1 = textoDe(a.p);
+    const n2 = textoDe(b.p);
+    if (!n1 || !n2) return null;
+    const g = document.createRange();
+    g.setStart(n1, Math.min(a.c, n1.length));
+    g.setEnd(n2, Math.min(b.c, n2.length));
+    return g;
+  }
+
+  /** Pone en el tramo pintado las notas (subrayado y lápiz) y los
+   *  marcadores (de corrido, una cinta al margen de su párrafo). */
+  function pintaMarcas(O) {
+    const art = $('#texto');
+    if (!art || L.vista !== O || L.tramo < 0) return;
+    const tr = O.tramos[L.tramo];
+    art.querySelectorAll('.nota-marca').forEach((b) => b.remove());
+    art.querySelectorAll('.marcado').forEach((el) => el.classList.remove('marcado'));
+    const rs = [];
+    for (const m of marcasDe(O)) {
+      if (m.tipo === 'nota') {
+        const g = rangoDe(O, m);
+        if (g) rs.push(g);
+        const q = (m.fin || m).p;
+        const el = q >= tr.desde && q < tr.hasta && art.querySelector('[data-i="' + q + '"]');
+        if (el) el.appendChild(lapizDe(m));
+      } else if (m.p >= tr.desde && m.p < tr.hasta) {
+        const el = art.querySelector('[data-i="' + m.p + '"]');
+        if (el) el.classList.add('marcado');
+      }
+    }
+    if (window.CSS && CSS.highlights && window.Highlight) {
+      if (rs.length) {
+        const h = new Highlight(...rs);
+        h.priority = -1;   // por debajo de la frase que suena
+        CSS.highlights.set('notas', h);
+      } else {
+        CSS.highlights.delete('notas');
+      }
+    }
+    pintaMarcador();
+  }
+
+  /** El lápiz que va detrás del trozo de una nota. Va al final del
+   *  párrafo, después de su texto: el primer hijo sigue siendo el texto. */
+  function lapizDe(m) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'nota-marca';
+    b.dataset.nota = m.id;
+    b.title = m.texto ? recorta(m.texto, 120) : 'Subrayado';
+    b.setAttribute('aria-label', m.texto ? 'Tu nota: ' + recorta(m.texto, 120) : 'Tu subrayado');
+    b.innerHTML = ico('lapiz');
+    return b;
+  }
+
+  /** Los marcadores de lo que se ve: por páginas, los de la página; de
+   *  corrido, los de los párrafos a la vista. */
+  function marcasAqui(O) {
+    if (!O || L.tramo < 0 || !$('#texto')) return [];
+    const tr = O.tramos[L.tramo];
+    const ms = marcasDe(O).filter((m) => m.tipo === 'marca' && m.p >= tr.desde && m.p < tr.hasta);
+    if (!ms.length) return [];
+    if (enPaginas()) return ms.filter((m) => paginaDe(m.p, m.c) === P.pagina);
+    const arriba = ($('.cabeza') || { offsetHeight: 0 }).offsetHeight;
+    const abajo = window.innerHeight - (($('.mandos') || { offsetHeight: 0 }).offsetHeight);
+    return ms.filter((m) => {
+      const el = $('#texto [data-i="' + m.p + '"]');
+      const r = el && el.getBoundingClientRect();
+      return r && r.bottom > arriba && r.top < abajo;
+    });
+  }
+
+  /** El botón del marcador, lleno si lo que se ve está marcado, y la
+   *  cinta de la página. */
+  function pintaMarcador() {
+    const b = $('#b-marca');
+    if (!b || !L.vista) return;
+    const si = marcasAqui(L.vista).length > 0;
+    if (b.getAttribute('aria-pressed') !== String(si) || !b.firstChild) {
+      b.innerHTML = ico(si ? 'marcado' : 'marcador');
+      b.setAttribute('aria-pressed', String(si));
+      b.setAttribute('aria-label', si ? 'Quitar el marcador de esta página' : 'Poner un marcador en esta página');
+      b.title = si ? 'Quitar el marcador' : 'Marcador';
+    }
+    const cinta = $('#marcapaginas');
+    if (cinta) cinta.hidden = !(si && enPaginas());
+  }
+
+  /** Un marcador en la letra `a` ({ p, c }). */
+  function ponMarcador(O, a) {
+    marcasDe(O).push({ id: Biblioteca.nuevoId(), tipo: 'marca', p: a.p, c: a.c,
+      cita: (a.c > 0 ? '…' : '') + recorta(O.t[a.p].slice(a.c), 160), hecho: Date.now(), cambiado: Date.now() });
+  }
+
+  /** El botón del marcador: marca la página que se ve (de corrido, el
+   *  primer párrafo a la vista), o le quita el marcador si ya lo tiene. */
+  function cambiaMarcador(O) {
+    const aqui = marcasAqui(O);
+    if (aqui.length) {
+      O.libro.marcas = marcasDe(O).filter((m) => !aqui.includes(m));
+      aviso('Marcador quitado.');
+    } else {
+      let a = null;
+      if (enPaginas()) a = anclaDe(P.pagina) || P.ancla;
+      else {
+        const p = primerVisible();
+        if (p !== null) a = { p: p, c: 0 };
+      }
+      if (!a) return;
+      ponMarcador(O, a);
+      aviso('Página marcada. Está en el índice, en «Marcadores y notas».');
+    }
+    guardaMarcas(O);
+    pintaMarcas(O);
+  }
+
+  /** La hoja de una nota: el trozo, dónde está y lo apuntado. Guardarla,
+   *  o quitarla, la pinta o la borra del texto. */
+  function editaNota(O, m, nueva) {
+    const d = $('#d-nota');
+    $('#dn-titulo').textContent = nueva ? 'Nueva nota' : 'Tu nota';
+    $('#dn-donde').textContent = dondeMarca(O, m);
+    $('#dn-cita').textContent = m.cita;
+    const t = $('#dn-texto');
+    t.value = m.texto || '';
+    $('#dn-quita').hidden = !!nueva;
+    // al escribir una nueva, el teclado sale solo; al mirar una, no
+    t.autofocus = !!nueva;
+    $('#dn-cita').autofocus = !nueva;
+    d.returnValue = '';
+    d.showModal();
+    return new Promise((res) => {
+      d.onclose = () => {
+        const v = d.returnValue;
+        if (v === 'guarda') {
+          // la de la lista, que puede ser otra si llegó de otro aparato
+          // mientras estaba abierta
+          const x = marcasDe(O).find((y) => y.id === m.id) || m;
+          x.texto = t.value.trim();
+          x.cambiado = Date.now();
+          if (nueva && x === m) marcasDe(O).push(m);
+          aviso(nueva ? 'Nota guardada. Está en el índice, en «Marcadores y notas».' : 'Nota guardada.');
+        } else if (v === 'quita') {
+          O.libro.marcas = marcasDe(O).filter((x) => x.id !== m.id);
+          aviso('Nota quitada.');
+        } else {
+          res(v);
+          return;
+        }
+        guardaMarcas(O);
+        pintaMarcas(O);
+        remaqueta(true);   // el lápiz ocupa sitio: la página puede correrse
+        res(v);
+      };
+    });
+  }
+
+  function abreNota(O, id) {
+    const m = marcasDe(O).find((x) => x.id === id);
+    if (m) editaNota(O, m, false);
+  }
+
+  /** La pestaña «Marcadores y notas» del índice: todos, en el orden del
+   *  libro. Tocar uno va a él. */
+  function pintaListaMarcas(O) {
+    const el = $('#marcas-lista');
+    const ms = marcasDe(O).slice().sort((a, b) => a.p - b.p || a.c - b.c);
+    $('#dx-cuenta').textContent = ms.length || '';
+    if (!ms.length) {
+      el.innerHTML = '<div class="sin-marcas">' + ico('marcador')
+        + '<p><b>Todavía no hay marcadores ni notas</b></p>'
+        + '<p class="nota">Toca ' + ico('marcador') + ' arriba para marcar la página que lees. '
+        + 'Para una nota, deja el dedo sobre una palabra, elige el trozo y toca «Nota».</p></div>';
+      el.onclick = null;
+      return;
+    }
+    el.innerHTML = '<ul>' + ms.map((m) => {
+      const nota = m.tipo === 'nota';
+      return '<li class="' + (nota ? 'es-nota' : 'es-marca') + '">'
+        + '<button type="button" class="ir" data-ir="' + esc(m.id) + '">'
+        + '<span class="tipo">' + ico(nota ? 'lapiz' : 'marcado') + '</span>'
+        + '<span class="cuerpo"><span class="donde">' + esc(dondeMarca(O, m) || (nota ? 'Nota' : 'Marcador'))
+        + '</span><span class="cita">' + esc(m.cita) + '</span>'
+        + (nota && m.texto ? '<span class="escrito">' + esc(m.texto) + '</span>' : '')
+        + '</span></button>'
+        + (nota ? '<button type="button" class="icono" data-edita="' + esc(m.id)
+          + '" aria-label="Cambiar la nota" title="Cambiar la nota">' + ico('lapiz') + '</button>' : '')
+        + '<button type="button" class="icono" data-quita="' + esc(m.id) + '" aria-label="Quitar'
+        + (nota ? ' la nota' : ' el marcador') + '" title="Quitar">' + ico('quita') + '</button></li>';
+    }).join('') + '</ul>';
+    el.onclick = async (ev) => {
+      const b = ev.target.closest('button');
+      if (!b) return;
+      const id = b.dataset.ir || b.dataset.edita || b.dataset.quita;
+      const m = marcasDe(O).find((x) => x.id === id);
+      if (!m) return;
+      if (b.dataset.ir) {
+        $('#d-indice').close();
+        dejaDeSeguir();
+        irA(m.p, false, m.c);
+        apuntaVista();
+      } else if (b.dataset.edita) {
+        await editaNota(O, m, false);
+        pintaListaMarcas(O);
+      } else {
+        if (m.tipo === 'nota' && m.texto && !confirm('¿Quitar esta nota?')) return;
+        O.libro.marcas = marcasDe(O).filter((x) => x.id !== m.id);
+        guardaMarcas(O);
+        pintaMarcas(O);
+        if (m.tipo === 'nota') remaqueta(true);
+        pintaListaMarcas(O);
+      }
+    };
+  }
+
+  /** La letra del libro ({ p, c }) de un punto de la selección: donde
+   *  empieza el trozo elegido, o con `fin`, donde acaba. */
+  function puntoDe(O, nodo, off, fin) {
+    const art = $('#texto');
+    let el;
+    if (nodo === art) {
+      // entre dos párrafos: el que sigue (o, al final, el de antes)
+      el = art.childNodes[fin ? off - 1 : off];
+      while (el && !(el.dataset && el.dataset.i !== undefined)) el = fin ? el.previousSibling : el.nextSibling;
+      if (!el) return null;
+      const p = +el.dataset.i;
+      return { p: p, c: fin ? O.t[p].length : 0 };
+    }
+    el = (nodo.nodeType === 3 ? nodo.parentElement : nodo).closest('[data-i]');
+    if (!el || !art.contains(el)) return null;
+    const p = +el.dataset.i;
+    let c;
+    if (nodo === el.firstChild && nodo.nodeType === 3) c = off;
+    else if (nodo === el) c = off === 0 ? 0 : O.t[p].length;
+    else c = O.t[p].length;   // dentro del lápiz de otra nota
+    return { p: p, c: Math.max(0, Math.min(O.t[p].length, c)) };
+  }
+
+  /** Una nota nueva con el trozo elegido. */
+  function notaDe(O, r) {
+    const a = puntoDe(O, r.startContainer, r.startOffset, false);
+    let b = puntoDe(O, r.endContainer, r.endOffset, true);
+    if (!a || !b) return;
+    // elegir un párrafo entero acaba en la entrada del siguiente
+    if (b.c === 0 && b.p > a.p) b = { p: b.p - 1, c: O.t[b.p - 1].length };
+    editaNota(O, { id: Biblioteca.nuevoId(), tipo: 'nota', p: a.p, c: a.c, fin: b,
+      cita: recorta(String(r), 400), texto: '', hecho: Date.now() }, true);
+  }
+
+  /** Un marcador donde empieza el trozo elegido. */
+  function marcaDe(O, r) {
+    const a = puntoDe(O, r.startContainer, r.startOffset, false);
+    if (!a) return;
+    ponMarcador(O, a);
+    guardaMarcas(O);
+    pintaMarcas(O);
+    aviso('Marcador puesto. Está en el índice, en «Marcadores y notas».');
+  }
+
+  /** La barra de lo seleccionado: al elegir un trozo del texto (en el
+   *  teléfono, dejando el dedo sobre una palabra) sale abajo, para hacer de
+   *  él una nota o poner ahí un marcador. */
+  function barraSeleccion(O) {
+    const bar = $('#seleccion');
+    // tocarla puede deshacer la selección antes del clic: se guarda en
+    // L.elegido, y mientras se toca, la barra no se va
+    bar.addEventListener('pointerdown', () => { L.pulsaBarra = true; });
+    const suelta = () => setTimeout(() => { L.pulsaBarra = false; }, 500);
+    bar.addEventListener('pointerup', suelta);
+    bar.addEventListener('pointercancel', suelta);
+    bar.addEventListener('mousedown', (ev) => ev.preventDefault());
+    const usa = (fn) => () => {
+      const r = L.elegido;
+      quitaSeleccion();
+      if (r) fn(O, r);
+    };
+    $('#b-sel-nota').addEventListener('click', usa(notaDe));
+    $('#b-sel-marca').addEventListener('click', usa(marcaDe));
+  }
+
+  function quitaSeleccion() {
+    L.elegido = null;
+    L.pulsaBarra = false;
+    const s = window.getSelection && getSelection();
+    if (s) s.removeAllRanges();
+    const bar = $('#seleccion');
+    if (bar) bar.hidden = true;
+  }
+
+  function miraSeleccion() {
+    const bar = $('#seleccion');
+    const art = $('#texto');
+    if (!bar || !art || !L.vista) return;
+    const s = getSelection();
+    let r = null;
+    if (s && !s.isCollapsed && s.rangeCount && String(s).trim()) {
+      const g = s.getRangeAt(0);
+      if (art.contains(g.commonAncestorContainer)) r = g.cloneRange();
+    }
+    if (r) {
+      L.elegido = r;
+      const m = $('.mandos');
+      bar.style.bottom = ((m ? m.offsetHeight : 0) + 14) + 'px';
+      bar.hidden = false;
+    } else if (!L.pulsaBarra) {
+      L.elegido = null;
+      bar.hidden = true;
+    }
+  }
+
+  let _sel = 0;
+  document.addEventListener('selectionchange', () => {
+    clearTimeout(_sel);
+    _sel = setTimeout(miraSeleccion, 150);
+  });
+
+  /* ---------------------------------------------------- las notas al pie */
 
   function pintaNotas(O) {
     const b = $('#b-notas');
@@ -1836,7 +2584,8 @@
     const e = Nube.estado();
     let h = '<h3 class="titulo-tarjeta">' + ico('nube') + 'Sincronizar con Google Drive</h3>'
       + '<p class="nota">Los libros que abras aquí salen también en tus otros aparatos, '
-      + 'con la frase por la que vas. Se guardan en una carpeta oculta de tu Drive que '
+      + 'con la frase por la que vas, sus marcadores y notas, y tus colecciones. Se guardan '
+      + 'en una carpeta oculta de tu Drive que '
       + 'sólo ve Lector. Sin conexión todo sigue igual: se pone al día después. '
       + '<a href="privacidad.html">Privacidad</a>.</p>';
     if (!e.disponible) {
@@ -1909,12 +2658,20 @@
   Nube.on('cambio', async (ids) => {
     const r = ruta();
     if (r.vista === 'biblioteca') {
-      if (!document.querySelector('dialog[open]')) pintaBiblioteca();
-    } else if (r.vista === 'libro' && L.vista && ids.includes(L.vista.libro.id)
-      && L.sonando !== L.vista) {
+      if (!document.querySelector('dialog[open]')) pintaBiblioteca(r.coleccion);
+    } else if (r.vista === 'libro' && L.vista && ids.includes(L.vista.libro.id)) {
+      const O = L.vista;
+      const l = await Biblioteca.libro(O.libro.id);
+      if (!l || L.vista !== O) return;
       // la posición que llega de otro aparato: para la próxima vez que se toque ▶
-      const l = await Biblioteca.libro(L.vista.libro.id);
-      if (l && L.vista) Object.assign(L.vista.libro, { pos: l.pos, leeNotas: l.leeNotas, cambiado: l.cambiado });
+      if (L.sonando !== O) Object.assign(O.libro, { pos: l.pos, leeNotas: l.leeNotas, cambiado: l.cambiado });
+      // las marcas y notas hechas en otro aparato, a la vista
+      const antes = JSON.stringify(O.libro.marcas || []);
+      Object.assign(O.libro, { marcas: l.marcas || [], colecciones: l.colecciones || [] });
+      if (JSON.stringify(O.libro.marcas) === antes) return;
+      pintaMarcas(O);
+      remaqueta(true);
+      if ($('#d-indice').open) pintaListaMarcas(O);
     }
   });
   Nube.inicia({ ocupado: (id) => !!L.sonando && L.sonando.libro.id === id

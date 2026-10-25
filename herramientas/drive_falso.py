@@ -8,6 +8,7 @@ Contesta lo poco de la API de Drive que usa la app, en http://localhost:8790:
   GET    /drive/v3/files?spaces=appDataFolder la lista, con sus appProperties
   GET    /drive/v3/files/<id>?alt=media      el contenido
   PATCH  /drive/v3/files/<id>                cambia appProperties (null quita)
+  PATCH  /upload/drive/v3/files/<id>?uploadType=media  cambia el contenido
   DELETE /drive/v3/files/<id>
   POST   /upload/drive/v3/files?uploadType=resumable  y luego
   PUT    /upload/sesion/<n>                  subir un archivo
@@ -159,6 +160,17 @@ class Drive(BaseHTTPRequestHandler):
 
     def do_PATCH(self):
         u = urlparse(self.path)
+        if u.path.startswith('/upload/drive/v3/files/'):
+            # uploadType=media: el contenido nuevo de un archivo que ya está
+            if not self.con_permiso():
+                return
+            f = archivos.get(u.path.rsplit('/', 1)[1])
+            if not f:
+                return self.contesta(404, {'error': {'code': 404, 'message': 'File not found'}})
+            datos = self.cuerpo()
+            with cerrojo:
+                f['datos'] = datos
+            return self.contesta(200, ficha(f))
         if not u.path.startswith('/drive/v3/files/') or not self.con_permiso():
             return
         f = archivos.get(u.path.rsplit('/', 1)[1])

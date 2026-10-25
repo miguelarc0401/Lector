@@ -319,7 +319,8 @@ en el teléfono y se oye bien.
 ### Fase 5 — Pulido y publicación
 
 - [ ] Normalización para la voz y diccionario de pronunciación.
-- [ ] Marcadores y búsqueda dentro del libro.
+- [x] Marcadores y notas (§7).
+- [ ] Búsqueda dentro del libro.
 - [ ] `LEEME.md`.
 
 ---
@@ -382,6 +383,8 @@ Por cada libro, dos archivos:
                        huella (SHA-256 del archivo)
                        y en sus «appProperties»: pos, leeNotas, cambiado
                        (la hora del último cambio), borrado
+   biblioteca.json     uno para todos: las colecciones, y las marcas y notas
+                       de cada libro (§7); en sus «appProperties», cambiado
 ```
 
 La posición va en las *appProperties* de la ficha (unos bytes que Drive
@@ -511,3 +514,78 @@ abren igual. Lo que no se ha podido probar sin Google: la ventana de Google
 de verdad (aquí se abrió en la misma página y volvió sola) y la app
 instalada en el teléfono.
 - [ ] Probado con Google en el PC y en el teléfono.
+
+---
+
+## 7. Marcadores, notas y colecciones (25-10-2026)
+
+**Marcadores y notas, dentro del libro:**
+
+- **Marcador**: la cinta de la cabecera marca la página que se ve (de
+  corrido, el primer párrafo a la vista). Con marcador, la cinta sale llena
+  y cuelga otra sobre la página; tocar cualquiera de las dos lo quita.
+- **Nota**: se elige un trozo del texto (en el teléfono, dejando el dedo
+  sobre una palabra y estirando) y abajo sale «Nota · Marcador». La nota
+  guarda el trozo y lo que se quiera apuntar (o nada: queda sólo
+  subrayado). En el texto, el trozo va subrayado en oro y lleva un lápiz al
+  final del párrafo, que la abre para cambiarla o quitarla.
+- **Todo junto** en el índice, en la pestaña «Marcadores y notas», por
+  orden del libro, con la página y el capítulo; tocar uno va a él, y ▶ lee
+  desde ahí.
+- Nada que ver con las notas al pie del libro («Sin notas» / «Con notas»).
+
+**Colecciones, en la biblioteca:**
+
+- Carpetas, unas dentro de otras, sin límite de hondura. En la biblioteca,
+  «Colecciones» va encima de todos los libros; cada carpeta enseña en
+  abanico los últimos libros abiertos de dentro y cuántos lleva (contando
+  los de sus subcolecciones).
+- Dentro de una colección: la ruta («Biblioteca › Historia › …»), sus
+  subcolecciones, sus libros y «Añadir libros» (casillas con todos los de
+  la biblioteca, o abrir un archivo nuevo, que entra ya en ella). El «⋯» de
+  arriba cambia el nombre, la mueve a otra colección o la quita (los libros
+  no se borran).
+- El «⋯» de cada libro: «Guardar en colecciones…» (casillas en árbol),
+  «Sacar de esta colección» y «Quitar de la biblioteca».
+- **Un libro puede estar en varias colecciones**, y la biblioteca sigue
+  enseñándolos todos: así ninguno se pierde de vista.
+
+**Cómo se guarda:** en la ficha de cada libro, `marcas` (con `p` y `c`,
+como la posición) y `colecciones` (los ids); las colecciones, en un almacén
+nuevo de IndexedDB (`colecciones`, versión 3 de la base). Quitar un libro
+se lleva sus marcas.
+
+- [x] Hecho y probado en la computadora (Chrome, a tamaño de teléfono).
+- [ ] Probarlo en el teléfono: sobre todo elegir el trozo con el dedo.
+- [x] **Viajan a Drive** (25-10-2026), si está conectado.
+
+### Las marcas y las colecciones en Drive
+
+Van todas en un archivo más de la carpeta oculta, `biblioteca.json` (las
+`appProperties` no caben notas largas). No se pisa: al sincronizar, si ha
+cambiado en Drive o aquí, se baja, **se mezcla pieza a pieza** con lo del
+aparato y cada lado se queda con la mezcla:
+
+- De cada colección, de cada marca o nota y de cada «este libro está (o no)
+  en esta colección» gana **el cambio más reciente**. Así lo apuntado en
+  dos aparatos sin red sale en los dos, y corregir una nota en uno y
+  añadir otra en el otro no pierde ninguna.
+- Lo que se quita deja apuntada la hora en que se quitó, para que se quite
+  también en los demás y no vuelva con la próxima mezcla (`quitadas` en la
+  ficha del libro; en las colecciones, `{ id, quitada }`).
+- Lo que se cambia aquí se manda a los pocos segundos (y al salir de la
+  app); sin red o sin permiso, en la próxima sincronización.
+- Con el libro abierto, las notas que llegan de otro aparato se pintan sin
+  cerrarlo.
+- Un libro quitado «de todos» se lleva sus marcas también de Drive; quitado
+  «sólo de aquí», se quedan allí, y vuelven con él si se vuelve a bajar.
+
+**Probado (25-10-2026) con el Drive de mentira**, «PC» en 8780 y
+«teléfono» en 8782: el teléfono, vacío, baja los libros con sus colecciones
+(unas dentro de otras), en cuáles está cada uno, y sus marcas y notas;
+cambios a la vez en los dos sin sincronizar entre medias (una nota nueva en
+cada uno, una corregida en el PC, un marcador quitado y una colección
+renombrada en el teléfono, otra colección quitada en el PC) acaban iguales
+en los dos y sin perder nada; con el libro abierto en el PC, la nota que se
+quita y la que se añade en el teléfono se ven al momento; quitar un libro
+«de todos» borra sus marcas de Drive. Falta: con Google de verdad.

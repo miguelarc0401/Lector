@@ -35,13 +35,66 @@
   </form>
 </dialog>
 
-<dialog id="d-indice" class="hoja" aria-labelledby="dx-titulo">
+<dialog id="d-indice" class="hoja" aria-label="Índice, marcadores y notas">
   <span class="asa" aria-hidden="true"></span>
   <div class="hoja-cabeza">
-    <h2 id="dx-titulo">Índice</h2>
+    <div class="segmentos pestanas" role="tablist">
+      <button type="button" role="tab" data-pestana="indice" aria-controls="indice-lista">Índice</button>
+      <button type="button" role="tab" data-pestana="marcas" aria-controls="marcas-lista">Marcadores y notas <span id="dx-cuenta" class="cuenta"></span></button>
+    </div>
     <form method="dialog"><button class="icono" aria-label="Cerrar"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg></button></form>
   </div>
-  <nav id="indice-lista" class="indice"></nav>
+  <nav id="indice-lista" class="indice" role="tabpanel"></nav>
+  <div id="marcas-lista" class="marcas" role="tabpanel" hidden></div>
+</dialog>
+
+<dialog id="d-nota" aria-labelledby="dn-titulo">
+  <form method="dialog">
+    <div class="dialogo-icono"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17z"/><path d="M13.5 8.5l2 2"/></svg></div>
+    <h2 id="dn-titulo">Nota</h2>
+    <p class="nota" id="dn-donde"></p>
+    <blockquote id="dn-cita" class="cita" tabindex="-1"></blockquote>
+    <label class="campo" for="dn-texto">Lo que quieras apuntar (o nada: queda subrayado)</label>
+    <textarea id="dn-texto" rows="5"></textarea>
+    <div class="botones">
+      <button value="guarda" class="principal">Guardar</button>
+      <button value="quita" id="dn-quita" class="peligro" formnovalidate>Quitar la nota</button>
+      <button value="cancela" formnovalidate>Cancelar</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="d-nombre" aria-labelledby="dno-titulo">
+  <form method="dialog">
+    <div class="dialogo-icono"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H9l2 2.5h8.5A1.5 1.5 0 0 1 21 10v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18z"/></svg></div>
+    <h2 id="dno-titulo">Nueva colección</h2>
+    <p class="nota" id="dno-nota"></p>
+    <label class="campo" for="dno-nombre">Nombre</label>
+    <input type="text" id="dno-nombre" required maxlength="80" autocomplete="off">
+    <div class="botones">
+      <button value="guarda" class="principal">Guardar</button>
+      <button value="cancela" formnovalidate>Cancelar</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="d-acciones" class="hoja ligera" aria-labelledby="dac-titulo">
+  <span class="asa" aria-hidden="true"></span>
+  <div class="hoja-cabeza">
+    <h2 id="dac-titulo"></h2>
+    <form method="dialog"><button class="icono" aria-label="Cerrar"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg></button></form>
+  </div>
+  <ul class="acciones" id="acciones-lista"></ul>
+</dialog>
+
+<dialog id="d-elige" class="hoja" aria-labelledby="de-titulo">
+  <span class="asa" aria-hidden="true"></span>
+  <div class="hoja-cabeza">
+    <div class="titulos"><h2 id="de-titulo"></h2><p class="nota" id="de-sub"></p></div>
+    <form method="dialog"><button class="icono" aria-label="Cerrar"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg></button></form>
+  </div>
+  <ul class="elige" id="de-lista"></ul>
+  <div class="elige-pie" id="de-pie"></div>
 </dialog>
 
 <dialog id="d-aspecto" class="hoja ligera" aria-labelledby="da-titulo">

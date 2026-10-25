@@ -46,6 +46,7 @@
   --sobre-acento: #fffaf3;
   --oro: #a7792e;
   --resalte: rgba(205, 120, 48, .24);
+  --subrayado: rgba(214, 168, 52, .26);
   --pliegue: rgba(70, 45, 20, .10);
   --bien: #2e6b3a;
   --mal: #a1301f;
@@ -80,6 +81,7 @@
     --sobre-acento: #1a1009;
     --oro: #d1a75c;
     --resalte: rgba(232, 162, 114, .32);
+    --subrayado: rgba(209, 167, 92, .22);
     --pliegue: rgba(0, 0, 0, .38);
     --bien: #7cc28a;
     --mal: #f08a78;
@@ -104,6 +106,7 @@
   --sobre-acento: #1a1009;
   --oro: #d1a75c;
   --resalte: rgba(232, 162, 114, .32);
+  --subrayado: rgba(209, 167, 92, .22);
   --pliegue: rgba(0, 0, 0, .38);
   --bien: #7cc28a;
   --mal: #f08a78;
@@ -128,6 +131,7 @@
   --sobre-acento: #fff7e8;
   --oro: #94671f;
   --resalte: rgba(170, 95, 30, .22);
+  --subrayado: rgba(176, 128, 26, .22);
   --pliegue: rgba(80, 50, 15, .12);
   --sombra: 0 1px 2px rgba(60, 40, 10, .08), 0 6px 20px rgba(60, 40, 10, .08);
 }
@@ -148,6 +152,7 @@
   --sobre-acento: #000;
   --oro: #a98348;
   --resalte: rgba(201, 134, 82, .30);
+  --subrayado: rgba(169, 131, 72, .26);
   --pliegue: rgba(0, 0, 0, 0);
   --bien: #6fae7c;
   --mal: #e07d6c;
@@ -735,7 +740,7 @@ main.biblioteca { max-width: 58rem; padding-top: max(1rem, env(safe-area-inset-t
   text-transform: uppercase;
   font-size: .68rem;
 }
-.ficha .quita {
+.ficha .mas {
   min-width: 40px;
   min-height: 40px;
   margin: -4px -10px -4px -4px;
@@ -745,8 +750,110 @@ main.biblioteca { max-width: 58rem; padding-top: max(1rem, env(safe-area-inset-t
   color: var(--tenue);
   justify-content: center;
 }
-.ficha .quita .ico { width: 18px; height: 18px; }
-@media (hover: hover) { .ficha .quita:hover:not(:disabled) { color: var(--mal); border-color: transparent; } }
+.ficha .mas .ico { width: 18px; height: 18px; }
+@media (hover: hover) { .ficha .mas:hover:not(:disabled) { color: var(--acento); border-color: transparent; } }
+
+/* Las colecciones: carpetas con los últimos libros de dentro en abanico */
+.carpetas {
+  list-style: none;
+  margin: 1rem 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(15rem, 46%), 1fr));
+  gap: .65rem;
+}
+.carpeta {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  width: 100%;
+  height: 100%;
+  min-height: 76px;
+  padding: .6rem .85rem .6rem .7rem;
+  border: 1px solid var(--linea);
+  border-radius: 18px;
+  background: var(--papel);
+  box-shadow: var(--sombra);
+  color: inherit;
+  font-weight: 400;
+  text-align: left;
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: box-shadow .2s, border-color .2s, scale .12s;
+}
+a.carpeta:active { scale: .98; }
+@media (hover: hover) {
+  .carpeta:hover, button.carpeta:hover:not(:disabled) { box-shadow: var(--sombra-alta); border-color: var(--linea-fuerte); }
+  .carpeta:hover .abanico .tapa:last-child { transform: rotate(9deg) translateY(-3px); }
+}
+.abanico {
+  position: relative;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 56px;
+  color: var(--acento);
+}
+.abanico > .ico { width: 30px; height: 30px; }
+.abanico .tapa {
+  position: absolute;
+  bottom: 3px;
+  left: 0;
+  width: 30px;
+  height: 45px;
+  border-radius: 2px 4px 4px 2px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .28);
+  transition: transform .2s cubic-bezier(.2, .8, .2, 1);
+}
+.abanico .tapa > span { display: none; }
+.abanico .tapa:nth-last-child(3) { left: 0; transform: rotate(-7deg); }
+.abanico .tapa:nth-last-child(2) { left: 8px; }
+.abanico .tapa:last-child { left: 16px; transform: rotate(6deg); }
+.abanico .tapa:only-child { left: 8px; transform: none; }
+.carpeta-datos { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: .12rem; }
+.carpeta-datos b {
+  font: 700 1.12rem/1.15 var(--letra-titulo);
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.carpeta-datos small { font-size: .78rem; color: var(--tenue); }
+.carpeta.nueva { border: 1.5px dashed var(--linea-fuerte); background: none; box-shadow: none; }
+.carpeta.nueva .abanico { width: 44px; height: 44px; border-radius: 14px; background: var(--acento-suave); }
+.carpeta.nueva .abanico .ico { width: 22px; height: 22px; }
+.carpeta.nueva b { color: var(--acento); }
+
+/* Dentro de una colección: dónde se está, el nombre y su menú */
+.portadilla.coleccion .titulos { flex: 1; min-width: 0; }
+.portadilla.coleccion h1 { overflow-wrap: anywhere; }
+.migas {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .05rem .4rem;
+  margin: .2rem 0 .2rem;
+  font-size: .8rem;
+  color: var(--tenue);
+}
+.migas a { color: inherit; font-weight: 600; text-decoration: none; }
+@media (hover: hover) { .migas a:hover { color: var(--acento); text-decoration: underline; } }
+.vacio-coleccion {
+  display: flex;
+  align-items: center;
+  gap: .85rem;
+  margin: 1rem 0 0;
+  padding: 1rem 1.1rem;
+  border: 1.5px dashed var(--linea-fuerte);
+  border-radius: 18px;
+  color: var(--tenue);
+  font-size: .92rem;
+  line-height: 1.45;
+}
+.vacio-coleccion .ico { width: 28px; height: 28px; color: var(--acento); }
+.vacio-coleccion b { color: var(--tinta); }
 
 /* Sin libros todavía */
 .vacio {
@@ -820,6 +927,8 @@ body.paginas .cabeza { border-bottom-color: transparent; }
   border-color: var(--acento);
   color: var(--acento-hondo);
 }
+/* el marcador puesto: la cinta llena, del color de la tapa */
+.cabeza #b-marca[aria-pressed="true"] { background: none; border-color: transparent; color: var(--acento); }
 
 main.lectura { padding-bottom: 13rem; }
 
@@ -895,6 +1004,114 @@ main.lectura { padding-bottom: 13rem; }
 ::highlight(suena) {
   background-color: var(--resalte);
   color: var(--tinta);
+}
+
+/* Tus notas: el trozo subrayado en oro, y un lápiz al final del párrafo
+ * que la abre (app.js, pintaMarcas). El lápiz es un botón dentro del
+ * párrafo: sin nada de lo de los botones, que no mueva los renglones. */
+::highlight(notas) {
+  background-color: var(--subrayado);
+  text-decoration: underline 1.5px var(--oro);
+  text-underline-offset: .18em;
+}
+
+.texto .nota-marca {
+  display: inline;
+  min-width: 0;
+  min-height: 0;
+  padding: 0 .12em;
+  margin: 0;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--oro);
+  font: inherit;
+  line-height: inherit;
+  text-indent: 0;
+  vertical-align: baseline;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.texto .nota-marca .ico { width: .9em; height: .9em; vertical-align: -.08em; stroke-width: 2.4; }
+.texto .nota-marca:active:not(:disabled) { background: var(--acento-suave); }
+
+/* De corrido, el párrafo marcado lleva una cinta al margen (por páginas,
+ * la cinta va arriba de la página: .marcapaginas) */
+body:not(.paginas) .texto .marcado { position: relative; }
+body:not(.paginas) .texto .marcado::before {
+  content: "";
+  position: absolute;
+  top: -.15em;
+  right: -.8rem;
+  width: .55rem;
+  height: 1.35rem;
+  background: var(--acento);
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 74%, 0 100%);
+}
+
+/* La cinta de la página marcada, colgando arriba en el margen. El botón
+ * es más grande que la cinta, para acertar con el dedo. */
+.marcapaginas { display: none; }
+body.paginas .marcapaginas {
+  display: block;
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 3;
+  width: 48px;
+  height: 56px;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+}
+body.paginas .marcapaginas::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: max(.3rem, calc(var(--margen) / 2 - .45rem));
+  width: .9rem;
+  height: 2.6rem;
+  background: linear-gradient(90deg, rgba(0, 0, 0, .12), transparent 30%, transparent 70%, rgba(0, 0, 0, .12)),
+    var(--acento);
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 78%, 0 100%);
+  animation: cuelga .35s cubic-bezier(.2, .9, .3, 1.2);
+}
+@keyframes cuelga { from { transform: translateY(-100%); } }
+
+/* La barra que sale al seleccionar un trozo del texto */
+.seleccion {
+  position: fixed;
+  left: 50%;
+  translate: -50% 0;
+  bottom: 13rem;
+  z-index: 6;
+  display: flex;
+  gap: .2rem;
+  padding: .3rem;
+  border-radius: 999px;
+  background: var(--tinta);
+  color: var(--pagina);
+  box-shadow: var(--sombra-alta);
+  animation: aparece .2s cubic-bezier(.2, .8, .2, 1);
+}
+.seleccion button {
+  min-height: 44px;
+  padding: .4rem 1.05rem .4rem .85rem;
+  border: 0;
+  background: none;
+  color: inherit;
+  font-size: .95rem;
+}
+.seleccion button .ico { width: 19px; height: 19px; }
+.seleccion button:active:not(:disabled) { background: color-mix(in srgb, var(--pagina) 16%, transparent); }
+@media (hover: hover) {
+  .seleccion button:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--pagina) 14%, transparent);
+    border-color: transparent;
+  }
 }
 
 button.tramo {
@@ -1427,8 +1644,32 @@ dialog.hoja[open] { display: flex; animation: sube .32s cubic-bezier(.2, .85, .2
   border-bottom: 1px solid var(--linea);
 }
 
-.hoja-cabeza h2 { margin: 0; }
+.hoja-cabeza h2 { margin: 0; min-width: 0; }
 .hoja-cabeza .icono { border-color: transparent; background: none; color: var(--tenue); }
+.hoja-cabeza .titulos { min-width: 0; padding: .1rem 0; }
+.hoja-cabeza .titulos .nota {
+  margin: .1rem 0 0;
+  font-size: .85rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Las pestañas del índice: el índice, y los marcadores y notas */
+.hoja-cabeza .pestanas { flex: 1; min-width: 0; margin-right: .5rem; }
+.pestanas button:first-child { flex: 0 0 auto; padding: .3rem 1rem; }
+.pestanas button { white-space: nowrap; }
+.pestanas .cuenta:not(:empty) {
+  margin-left: .1rem;
+  padding: .05rem .42rem;
+  border-radius: 999px;
+  background: var(--acento-suave);
+  color: var(--acento-hondo);
+  font-size: .74rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.pestanas button[aria-selected="true"] .cuenta { background: rgba(255, 255, 255, .22); color: inherit; }
 
 @keyframes aparece { from { opacity: 0; transform: translateY(10px) scale(.97); } }
 @keyframes sube { from { transform: translateY(100%); } }
@@ -1477,7 +1718,7 @@ dialog.hoja.ligera::backdrop { background: rgba(20, 15, 10, .14); -webkit-backdr
   justify-content: center;
   color: var(--tenue);
 }
-.segmentos button[aria-pressed="true"] {
+.segmentos button[aria-pressed="true"], .segmentos button[aria-selected="true"] {
   background: var(--acento);
   color: var(--sobre-acento);
   font-weight: 600;
@@ -1672,6 +1913,160 @@ dialog.hoja.ligera::backdrop { background: rgba(20, 15, 10, .14); -webkit-backdr
 }
 
 .indice details[open] > summary::after { transform: rotate(45deg); }
+
+/* --------------------------------------------- marcadores y notas */
+
+.marcas { overflow-y: auto; padding: .4rem .6rem 1.2rem; }
+.marcas ul { list-style: none; margin: 0; padding: 0; }
+.marcas li { display: flex; align-items: flex-start; border-bottom: 1px solid var(--linea); }
+.marcas li:last-child { border-bottom: 0; }
+.marcas .ir {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  align-items: flex-start;
+  gap: .75rem;
+  padding: .7rem .55rem;
+  border: 0;
+  border-radius: 12px;
+  background: none;
+  font-weight: 400;
+  text-align: left;
+}
+.marcas .tipo { flex: none; margin-top: .1rem; color: var(--acento); }
+.marcas .es-nota .tipo { color: var(--oro); }
+.marcas .tipo .ico { width: 20px; height: 20px; }
+.marcas .cuerpo { min-width: 0; display: flex; flex-direction: column; gap: .25rem; }
+.marcas .donde { font-size: .76rem; font-weight: 600; color: var(--tenue); font-variant-numeric: lining-nums; }
+.marcas .cita {
+  font: italic 400 .95rem/1.42 var(--letra-libro);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.marcas .es-nota .cita { text-decoration: underline 1px var(--oro); text-underline-offset: .2em; }
+.marcas .escrito {
+  padding: .4rem .65rem;
+  border-left: 3px solid var(--oro);
+  border-radius: 0 10px 10px 0;
+  background: var(--fondo);
+  font-size: .92rem;
+  line-height: 1.42;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.marcas li > .icono {
+  flex: none;
+  min-width: 40px;
+  min-height: 40px;
+  margin-top: .4rem;
+  border-color: transparent;
+  background: none;
+  color: var(--tenue);
+}
+.marcas li > .icono .ico { width: 18px; height: 18px; }
+@media (hover: hover) {
+  .marcas .ir:hover { background: var(--fondo); }
+  .marcas li > [data-quita]:hover:not(:disabled) { color: var(--mal); border-color: transparent; }
+}
+
+.sin-marcas { text-align: center; padding: 1.8rem 1.6rem 2.4rem; }
+.sin-marcas > .ico {
+  width: 52px;
+  height: 52px;
+  padding: 13px;
+  border-radius: 16px;
+  background: var(--acento-suave);
+  color: var(--acento);
+}
+.sin-marcas p { max-width: 22rem; margin: .5rem auto 0; }
+.sin-marcas p .ico { width: 1.1em; height: 1.1em; vertical-align: -.2em; color: var(--acento); }
+
+/* La hoja de una nota: el trozo, como cita, y lo apuntado */
+#dn-donde { margin: -.3rem 0 .5rem; font-size: .85rem; }
+blockquote.cita {
+  margin: 0 0 .3rem;
+  padding: .6rem .85rem;
+  max-height: 9.5em;
+  overflow-y: auto;
+  border-left: 3px solid var(--oro);
+  border-radius: 0 12px 12px 0;
+  background: var(--subrayado);
+  font: italic 400 1rem/1.5 var(--letra-libro);
+}
+blockquote.cita:focus { outline: none; }
+button.peligro { color: var(--mal); }
+
+/* ---------------------------------------------- las hojas de elegir */
+
+/* El menú de un libro o de una colección */
+#dac-titulo {
+  font-size: 1.3rem;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.acciones { list-style: none; margin: 0; padding: .5rem .6rem 1rem; overflow-y: auto; }
+.acciones button {
+  width: 100%;
+  min-height: 54px;
+  gap: .9rem;
+  padding: .5rem .85rem;
+  border: 0;
+  border-radius: 14px;
+  background: none;
+  font-weight: 500;
+  text-align: left;
+}
+.acciones button .ico { color: var(--acento); }
+.acciones button.peligro, .acciones button.peligro .ico { color: var(--mal); }
+.acciones button:active:not(:disabled) { background: var(--acento-suave); }
+@media (hover: hover) { .acciones button:hover:not(:disabled) { background: var(--fondo); } }
+
+/* Elegir colecciones, libros o adónde mover una colección */
+.elige { list-style: none; margin: 0; padding: .45rem .6rem .8rem; overflow-y: auto; flex: 1; min-height: 0; }
+.elige li { padding-left: calc(var(--nivel, 0) * 1.3rem); }
+.casilla, .elige .destino {
+  display: flex;
+  align-items: center;
+  gap: .7rem;
+  width: 100%;
+  min-height: 50px;
+  padding: .45rem .7rem;
+  border-radius: 12px;
+  font-size: 1rem;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.casilla input { flex: none; width: 22px; height: 22px; margin: 0; accent-color: var(--acento); cursor: pointer; }
+.casilla > .ico, .elige .destino > .ico { width: 20px; height: 20px; color: var(--acento); }
+.casilla > span { min-width: 0; overflow-wrap: anywhere; }
+.casilla:has(input:checked) { background: var(--acento-suave); }
+.casilla.con-tapa .tapa { width: 34px; height: 51px; box-shadow: 0 1px 3px rgba(0, 0, 0, .25); }
+.casilla.con-tapa .tapa > span { display: none; }
+.casilla.con-tapa > span { display: flex; flex-direction: column; gap: .05rem; }
+.casilla.con-tapa b { font: 700 1.05rem/1.2 var(--letra-titulo); }
+.casilla.con-tapa small { font-size: .8rem; color: var(--tenue); }
+.elige .destino { border: 0; background: none; font-weight: 500; text-align: left; }
+.elige .destino small { margin-left: auto; padding-left: .5rem; font-size: .76rem; color: var(--tenue); white-space: nowrap; }
+.elige .destino[aria-current="true"] { color: var(--tenue); }
+.elige .nada { padding: 1rem .7rem; color: var(--tenue); font-size: .92rem; }
+@media (hover: hover) {
+  .casilla:hover, .elige .destino:hover:not(:disabled) { background: var(--fondo); border-color: transparent; }
+  .casilla:has(input:checked):hover { background: var(--acento-suave); }
+}
+.elige-pie {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: .5rem;
+  padding: .7rem 1rem .9rem;
+  border-top: 1px solid var(--linea);
+}
+.elige-pie:empty { display: none; }
+.elige-pie .ico { width: 19px; height: 19px; }
 
 /* ------------------------------------------------------------- ajustes */
 
