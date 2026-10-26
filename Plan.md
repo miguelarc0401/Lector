@@ -298,10 +298,14 @@ volver a mirar el teléfono la vista está en la oración que suena.
 
 ### Fase 3 — PDF con texto y Word
 
-- [ ] pdf.js: texto, marcadores, tamaños de letra.
-- [ ] Limpieza: cabeceras, pies, números de página, guiones, notas.
-- [ ] Emparejar el índice impreso con el cuerpo.
-- [ ] DOCX con mammoth.js.
+- [x] pdf.js: texto, marcadores, tamaños de letra. *(25-10-2026: pdf.js
+      4.10.38 va dentro de la app, en `app/pdfjs/`, para abrir sin red.)*
+- [x] Limpieza: cabeceras, pies, números de página, guiones, notas (las
+      notas al pie van detrás del párrafo que las llama, como en el EPUB).
+- [ ] Emparejar el índice impreso con el cuerpo. *(Por ahora: marcadores
+      del PDF; si no trae, la letra más grande.)*
+- [x] DOCX — sin mammoth.js: es un ZIP, y se lee como el EPUB. Títulos por
+      sus estilos, notas al pie y al final. De paso, ODT y HTML.
 - [ ] Pantalla «Revisar índice».
 
 **Listo cuando:** un PDF digital de un libro tuyo queda partido como su índice

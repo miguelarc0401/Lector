@@ -52,7 +52,9 @@
   /* La posición se manda como mucho una vez por minuto mientras se lee. */
   const CADA = 60000;
 
-  const TIPOS = { epub: 'application/epub+zip', txt: 'text/plain', md: 'text/markdown' };
+  const TIPOS = { epub: 'application/epub+zip', txt: 'text/plain', md: 'text/markdown',
+    pdf: 'application/pdf', html: 'text/html', odt: 'application/vnd.oasis.opendocument.text',
+    docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' };
 
   function leeLS(k) {
     try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (_) { return null; }

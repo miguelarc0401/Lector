@@ -91,7 +91,9 @@
   const TRAMO = 500;
 
   /* Los archivos que se pueden abrir como libro. */
-  const ACEPTA = '.epub,.txt,.md,application/epub+zip,text/plain,text/markdown';
+  const ACEPTA = '.epub,.pdf,.docx,.odt,.txt,.md,.html,.htm,application/epub+zip,application/pdf,'
+    + 'application/vnd.openxmlformats-officedocument.wordprocessingml.document,'
+    + 'application/vnd.oasis.opendocument.text,text/plain,text/markdown,text/html';
 
   /* ------------------------------------------------------------ ajustes */
 
@@ -515,7 +517,7 @@
             + estado
             + '<ul class="estante">' + libros.map(ficha).join('') + '</ul>'
           : '<section class="vacio">' + SELLO + '<h2>Tu biblioteca está vacía</h2>'
-            + '<p>Abre un EPUB o un TXT: se guarda aquí, con su índice, y se puede escuchar '
+            + '<p>Abre un EPUB, un PDF o un Word: se guarda aquí, con su índice, y se puede escuchar '
             + 'sin conexión desde cualquier párrafo.</p>'
             + '<label class="boton principal" tabindex="0">' + ico('mas') + 'Abrir un libro' + abrir + '</label>'
             + estado + '</section>')
@@ -849,8 +851,8 @@
   }
 
   const textoImporta = () => (Nube.estado().conectada
-    ? 'EPUB o TXT. Se guarda aquí y en tu Google Drive, para tus otros aparatos.'
-    : 'EPUB o TXT. El libro no sale de este teléfono.');
+    ? 'EPUB, PDF, Word (DOCX), ODT, TXT o HTML. Se guarda aquí y en tu Google Drive, para tus otros aparatos.'
+    : 'EPUB, PDF, Word (DOCX), ODT, TXT o HTML. El libro no sale de este teléfono.');
 
   /** Quitar un libro: si está en Drive, de aquí sólo o de todos los
    *  aparatos. Devuelve 'aqui', 'todos' o nada. */
@@ -906,7 +908,10 @@
     est.textContent = 'Abriendo «' + file.name + '»…';
     let r;
     try {
-      r = await Importa.archivo(file);
+      r = await Importa.archivo(file, (i, n) => {
+        est.textContent = 'Abriendo «' + file.name + '»: página ' + i.toLocaleString('es')
+          + ' de ' + n.toLocaleString('es') + '…';
+      });
     } catch (err) {
       console.error(err);
       est.className = 'mal';

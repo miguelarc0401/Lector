@@ -46,7 +46,9 @@ const DESPUES = [
   'icono-maskable-512.png',
   'pruebas.html',
   'privacidad.html',
-  'pruebas.js'
+  'pruebas.js',
+  'pdfjs/pdf.min.mjs',          // para abrir PDF: sólo se carga al abrir uno
+  'pdfjs/pdf.worker.min.mjs'
 ];
 
 async function guarda(c, ficheros) {
