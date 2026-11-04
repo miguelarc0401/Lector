@@ -53,6 +53,17 @@
    * piper.js entre las dos partes. */
   const PAUSA = { frase: 0.12, parrafo: 0.55 };
 
+  /* Piper acelera sola hasta el doble; más allá, cada sonido se queda en uno
+   * o dos cuadros de la red y la voz se atropella. Lo que pase de ahí lo pone
+   * el reproductor, que acelera el audio ya hecho sin subirle el tono. */
+  const VEL_PIPER = 2;
+
+  /** La velocidad, repartida: la que se le pide a Piper y la del audio. */
+  function reparte(vel) {
+    const piper = Math.min(vel || 1, VEL_PIPER);
+    return { piper: piper, audio: (vel || 1) / piper };
+  }
+
   /* Un trozo no pasa de esta medida. Piper no tiene el defecto de Chrome
    * que obligaba en Liturgicum a 220, pero un trozo largo tarda en empezar a
    * sonar —al tocar un párrafo se espera a que esté hecho entero— y uno muy
@@ -134,13 +145,14 @@
    *  la voz en memoria, y eso no es lo que tarda leyendo. */
   async function prueba(id, texto, vel) {
     const p = partes(id);
+    const v = reparte(vel);
     const q = { tipo: 'di', voz: p.voz, hablante: p.hablante,
-      texto: paraDecir(texto, lenguaDe(id)), vel: vel || 1, pausa: PAUSA.frase };
+      texto: paraDecir(texto, lenguaDe(id)), vel: v.piper, pausa: PAUSA.frase };
     await pide(q);
     W.cargada = p.voz;
     const r = await pide(q);
-    return { segundos: r.segundos, ms: r.ms, msFon: r.msFon, msRed: r.msRed,
-      blob: new Blob([r.wav], { type: 'audio/wav' }) };
+    return { segundos: r.segundos / v.audio, ms: r.ms, msFon: r.msFon, msRed: r.msRed,
+      blob: new Blob([r.wav], { type: 'audio/wav' }), vel: v.audio };
   }
 
   /* ------------------------------------------------------ partir el texto */
@@ -526,20 +538,22 @@
     const pausa = tz.fin ? PAUSA.parrafo : PAUSA.frase;
     const v0 = vis();
     const fria = W.cargada !== p.voz;
+    const v = reparte(S.vel);
     h = { r: null };
     h.p = pide({ tipo: 'di', voz: p.voz, hablante: p.hablante,
-      texto: paraDecir(tz.texto, lenguaDe(S.voz)), vel: S.vel,
+      texto: paraDecir(tz.texto, lenguaDe(S.voz)), vel: v.piper,
       pausa: PAUSA.frase }).then((d) => {
       W.cargada = p.voz;
       const wav = conSilencio(d.wav, pausa);
+      // `segundos`: los que dura al oírlo, con el reproductor ya acelerado
       h.r = { blob: new Blob([wav], { type: 'audio/wav' }),
-        segundos: d.segundos + pausa, bytes: wav.byteLength };
+        segundos: (d.segundos + pausa) / v.audio, vel: v.audio, bytes: wav.byteLength };
       // el ritmo sólo cuenta si la pantalla estuvo igual de principio a fin,
       // y con la voz ya cargada
       const v1 = vis();
       if (M && v0 === v1 && !fria) {
         const m = M.ritmo[v1];
-        m.voz += d.segundos; m.ms += d.ms; m.n++;
+        m.voz += d.segundos / v.audio; m.ms += d.ms; m.n++;
       }
       if (M) M.maxMemoria = Math.max(M.maxMemoria, memoria());
       return h.r;
@@ -652,6 +666,8 @@
     if (S.url) URL.revokeObjectURL(S.url);
     S.url = URL.createObjectURL(r.blob);
     const a = new Audio(S.url);
+    a.preservesPitch = true;
+    a.defaultPlaybackRate = a.playbackRate = r.vel || 1;
     S.audio = a;
     a.addEventListener('playing', () => {
       if (M && M._acabo && !seNota) {

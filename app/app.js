@@ -107,8 +107,8 @@
     interlinea: 'normal', margen: 'normal', justifica: 'si' }, A.lec || {});
 
   // las velocidades que se pueden elegir, en la cinta y en Ajustes:
-  // de 0,1 en 0,1, de 0,6 a 2
-  const VELS = Array.from({ length: 15 }, (_, i) => (6 + i) / 10);
+  // de 0,1 en 0,1, de 0,6 a 3
+  const VELS = Array.from({ length: 25 }, (_, i) => (6 + i) / 10);
   const velTexto = (v) => String(v).replace('.', ',') + '×';
 
   /** Un paso más despacio (-1) o más deprisa (+1), desde la de ahora. */

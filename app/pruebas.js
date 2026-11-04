@@ -176,10 +176,12 @@
       + 'la dice. ' + juicio(x, id) };
   }
 
-  function oye(blob) {
+  function oye(r) {
     return new Promise((res) => {
-      const url = URL.createObjectURL(blob);
+      const url = URL.createObjectURL(r.blob);
       const a = new Audio(url);
+      a.preservesPitch = true;
+      a.defaultPlaybackRate = a.playbackRate = r.vel || 1;
       const fin = () => { URL.revokeObjectURL(url); res(); };
       a.addEventListener('ended', fin);
       a.addEventListener('error', fin);
@@ -228,7 +230,7 @@
       const r = await Voz.prueba(A.voz, FRASE[Voz.lenguaDe(A.voz)] || FRASE.es, +A.vel);
       H.medida = medidaDe(r, A.voz).texto;
       pintaVoz();
-      await oye(r.blob);
+      await oye(r);
     } catch (err) {
       H.medida = 'La prueba ha fallado: ' + err.message;
     }
@@ -275,7 +277,7 @@
         const r = await Voz.prueba(id, FRASE[l] || FRASE.es, +A.vel);
         hechas.push(rotulo(id) + ': ' + coma(medidaDe(r, id).x) + ' veces');
         est.textContent = 'Ahora: ' + rotulo(id);
-        await oye(r.blob);
+        await oye(r);
       } catch (err) {
         hechas.push(rotulo(id) + ': falló (' + err.message + ')');
       }
@@ -598,7 +600,7 @@
           pintaVoz();
           return;
         }
-        try { await oye((await Voz.prueba(A.voz, escrito, +A.vel)).blob); }
+        try { await oye(await Voz.prueba(A.voz, escrito, +A.vel)); }
         catch (err) { H.medida = 'No se pudo decir: ' + err.message; pintaVoz(); }
       });
       ul.appendChild(li);

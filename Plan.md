@@ -196,8 +196,10 @@ con adelantar cuarenta trozos; un libro se escucha horas. Lo que se hace:
   tampoco, el plan B de la app nativa (§5).
 - **Tocar un párrafo** suelta lo adelantado y empieza ahí: la primera frase
   se hace sola, para que suene en un segundo.
-- **La velocidad** se le pide a Piper (dice más deprisa, sin cambiar el tono);
-  al cambiarla se rehace lo adelantado.
+- **La velocidad** (de 0,6× a 3×) se le pide a Piper hasta 2× (dice más
+  deprisa, sin cambiar el tono); lo que pase de 2× lo pone el reproductor
+  (`playbackRate`, también sin subir el tono), porque Piper más allá se
+  atropella. Al cambiarla se rehace lo adelantado.
 
 ### 2.6 Leer y escuchar
 
