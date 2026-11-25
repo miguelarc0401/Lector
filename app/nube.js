@@ -409,7 +409,7 @@
     });
     // la posición, sólo si el libro ha salido partido igual que allí
     if (!a.n || +a.n === l.n) l.pos = { p: +a.p || 0, f: +a.f || 0 };
-    await Biblioteca.guarda(l, { t: t.t, h: t.h, k: t.k || {} }, file);
+    await Biblioteca.guarda(l, { t: t.t, h: t.h, k: t.k || {}, v: t.v || {} }, file);
   }
 
   async function marcaBorrado(r) {

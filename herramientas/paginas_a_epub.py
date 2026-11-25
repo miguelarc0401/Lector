@@ -14,6 +14,9 @@ orden del PDF) con esta forma:
                               texto aparte
     Texto con nota[^5].       llamada a la nota 5 (o [^*], [^102*])
     _cursiva_  **negrita**
+    [v12] Y dijo Dios…        número de versículo, al empezar el párrafo: sale
+                              como <span class="versiculo">; Lector lo enseña
+                              pero no lo lee
 
     ====                      lo de abajo son las notas al pie de la página
     [5] Texto de la nota.
@@ -191,6 +194,7 @@ def enlinea(t, cap, llamadas=None):
     t = html.escape(t, quote=False)
     t = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', t)
     t = re.sub(r'(?<!\w)_(.+?)_(?!\w)', r'<i>\1</i>', t)
+    t = re.sub(r'^\[v(\d+[a-z]?)\]\s*', r'<span class="versiculo">\1</span> ', t)
 
     def llamada(m):
         ref = html.escape(m.group(1))
@@ -204,7 +208,7 @@ def enlinea(t, cap, llamadas=None):
 
 
 def sinmarcas(t):
-    t = re.sub(r'\[\^[^\]]+\]', '', t)
+    t = re.sub(r'\[\^[^\]]+\]|^\[v\d+[a-z]?\]\s*', '', t)
     return re.sub(r'\*\*|(?<!\w)_|_(?!\w)', '', t)
 
 
@@ -241,7 +245,9 @@ def capitulo_xhtml(c, archivo, toc):
         partes.append('<h2 class="notas-titulo">Notas</h2>')
         for j, (ref, pars, _) in enumerate(c['notas'], 1):
             i = nid(n, j)
-            cuerpo = ''.join('<p>%s%s</p>' % (
+            # con un renglón entre párrafo y párrafo: al juntar el texto de
+            # la nota para leerla, no se pegan «…fin.Siguiente»
+            cuerpo = '\n'.join('<p>%s%s</p>' % (
                 ('<a href="#r%s" class="vuelta">%s</a> ' % (i, html.escape(ref))) if j == 0 else '',
                 enlinea(p, n)) for j, p in enumerate(pars))
             partes.append('<aside epub:type="footnote" role="doc-footnote" id="%s">%s</aside>'
@@ -280,6 +286,7 @@ h1, h2 { text-align: center; }
 h4, h5 { font-size: 1em; margin: 1.2em 0 .3em; }
 p { text-indent: 1.2em; margin: 0 0 .4em; text-align: justify; }
 sup a { text-decoration: none; font-size: .75em; }
+.versiculo { font-weight: bold; font-size: .75em; color: #7a1c1c; }
 .notas { margin-top: 2em; border-top: 1px solid #999; font-size: .85em; }
 .notas p { text-indent: 0; }
 .notas-titulo { font-size: 1em; text-align: left; }

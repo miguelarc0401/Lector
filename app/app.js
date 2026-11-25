@@ -225,8 +225,9 @@
 
   function abierto(libro, texto) {
     const O = { libro: libro, t: texto.t, h: texto.h || {}, k: texto.k || {},
-      trozos: null, primero: null, rangos: new Map() };
+      v: texto.v || {}, trozos: null, primero: null, rangos: new Map() };
     O.hayNotas = Object.keys(O.k).length > 0;
+    O.hayNumeros = Object.keys(O.v).length > 0;
     O.plano = aplanaIndice(libro.indice || []);
     O.tramos = tramos(libro.indice || [], O.t.length);
     return O;
@@ -973,7 +974,7 @@
         colecciones: cid ? [cid] : []
       });
       try {
-        await Biblioteca.guarda(libro, { t: r.t, h: r.h, k: r.k || {} }, file);
+        await Biblioteca.guarda(libro, { t: r.t, h: r.h, k: r.k || {}, v: r.v || {} }, file);
       } catch (err) {
         alert('No se pudo guardar el libro: ' + (err.message || err));
         return;
@@ -1007,6 +1008,7 @@
       + '<a class="boton icono" href="#/" aria-label="Biblioteca" title="Biblioteca">' + ico('atras') + '</a>'
       + '<div class="rotulos"><b>' + esc(O.libro.titulo) + '</b>'
       + '<span id="capitulo" class="nota"></span></div>'
+      + (O.hayNumeros ? '<button type="button" class="boton icono" id="b-numeros"></button>' : '')
       + (O.hayNotas ? '<button type="button" class="boton" id="b-notas"></button>' : '')
       + '<button type="button" class="boton icono" id="b-marca" aria-pressed="false"></button>'
       + '<button type="button" class="boton icono" id="b-indice" aria-label="Índice, marcadores y notas" '
@@ -1014,7 +1016,8 @@
       + '</header>'
       + '<main class="lectura">'
       + '<div id="cornisa" class="cornisa" title="Ver sólo la página, o los mandos"></div>'
-      + '<div id="hoja"><article id="texto" class="texto" lang="'
+      + '<div id="hoja"><article id="texto" class="texto'
+      + (O.hayNumeros && O.libro.sinNumeros ? ' sin-numeros' : '') + '" lang="'
       + esc(O.libro.lengua || 'es') + '"></article>'
       + '<button type="button" id="marcapaginas" class="marcapaginas" aria-label="Quitar el marcador de esta página" '
       + 'title="Quitar el marcador" hidden></button></div>'
@@ -1047,6 +1050,10 @@
     if (O.hayNotas) {
       $('#b-notas').addEventListener('click', () => cambiaNotas(O));
       pintaNotas(O);
+    }
+    if (O.hayNumeros) {
+      $('#b-numeros').addEventListener('click', () => cambiaNumeros(O));
+      pintaNumeros(O);
     }
     $('#b-sigue').addEventListener('click', () => {
       L.sigue = true;
@@ -1097,13 +1104,16 @@
       const el = document.createElement(n ? (n === 1 ? 'h2' : n === 2 ? 'h3' : 'h4') : 'p');
       el.dataset.i = p;
       el.textContent = O.t[p];
+      // el número del versículo se pinta con CSS (::before): no es parte
+      // del texto, así que ni se lee ni descuadra las frases
+      if (O.v[p]) el.dataset.v = O.v[p];
       if (O.k[p]) {
         el.className = 'nota-pie';
         el.hidden = callada(O, p);
       } else if (n === 1 || n === 2) {
         capitular = true;
       } else if (!n && capitular) {
-        if (/^\p{L}/u.test(O.t[p])) el.className = 'capitular';
+        if (/^\p{L}/u.test(O.t[p]) && !O.v[p]) el.className = 'capitular';
         capitular = false;
       }
       f.appendChild(el);
@@ -2159,6 +2169,33 @@
     if (L.sigue && suena) sigueALaVoz(false);
     else irA(v, false);
     aviso(leeNotas(O) ? 'Ahora lee también las notas, detrás de su párrafo.' : 'Ahora lee sólo el texto.');
+  }
+
+  /* ------------------------------------------- los números de versículo */
+
+  /* Un libro con versículos (la Biblia) los trae aparte del texto (`O.v`):
+   * se ven o no, según el libro, pero la voz no los lee nunca. */
+
+  function pintaNumeros(O) {
+    const b = $('#b-numeros');
+    if (!b) return;
+    const si = !O.libro.sinNumeros;
+    b.innerHTML = '<span class="cifras" aria-hidden="true">12</span>';
+    b.setAttribute('aria-pressed', si ? 'true' : 'false');
+    b.setAttribute('aria-label', si ? 'Con números de versículo' : 'Sin números de versículo');
+    b.title = si ? 'Se ven los números de los versículos (no se leen). Toca para quitarlos.'
+      : 'No se ven los números de los versículos. Toca para verlos.';
+  }
+
+  function cambiaNumeros(O) {
+    O.libro.sinNumeros = !O.libro.sinNumeros;
+    Biblioteca.cambia(O.libro.id, { sinNumeros: O.libro.sinNumeros }).catch(() => {});
+    const art = $('#texto');
+    if (art) art.classList.toggle('sin-numeros', O.libro.sinNumeros);
+    pintaNumeros(O);
+    remaqueta(true);   // por páginas, cambia lo que cabe en cada una
+    aviso(O.libro.sinNumeros ? 'Ahora no se ven los números de los versículos.'
+      : 'Ahora se ven los números de los versículos. La voz no los lee.');
   }
 
   /* -------------------------------------------------------------- la voz */

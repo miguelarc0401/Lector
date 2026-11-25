@@ -998,6 +998,29 @@ main.lectura { padding-bottom: 13rem; }
   transition: box-shadow .25s;
 }
 
+/* El número del versículo (en la Biblia), pequeño y en color delante del
+ * párrafo. Es un ::before, no texto: la voz no lo lee y no cuenta en las
+ * frases. Con «sin números» no se ve. */
+.texto [data-v]::before {
+  content: attr(data-v);
+  font: 700 .66em/1 var(--letra-ui);
+  letter-spacing: 0;
+  color: var(--acento);
+  vertical-align: .3em;
+  margin-right: .3em;
+}
+.texto.sin-numeros [data-v]::before { content: none; }
+
+.cabeza #b-numeros .cifras {
+  font: 700 .8rem/1 var(--letra-ui);
+  letter-spacing: .02em;
+}
+/* sin números: el «12» tachado */
+.cabeza #b-numeros[aria-pressed="false"] .cifras {
+  text-decoration: line-through;
+  color: var(--tenue);
+}
+
 /* el párrafo que suena lleva una raya al margen, y su frase, el resalte */
 .texto .sonando { box-shadow: -.6rem 0 0 -.38rem var(--acento); }
 

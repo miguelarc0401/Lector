@@ -158,6 +158,15 @@
     return false;
   }
 
+  /** El número de un versículo («12», «3a»), si el elemento lo es: un
+   *  <span class="versiculo"> (o «verse», «versenum», «verse-num», como en
+   *  otras Biblias) que sólo trae ese número; si no, null. */
+  function esVersiculo(el) {
+    if (!/\b(versiculo|verse|versenum|verse-num|vers)\b/i.test(el.getAttribute('class') || '')) return null;
+    const m = /^\s*(\d{1,3}[a-z]?)[.:]?\s*$/.exec(el.textContent);
+    return m ? m[1] : null;
+  }
+
   /** El texto de la nota a la que lleva una llamada, o null. La nota no se
    *  lee donde está —al final del capítulo, o en otro archivo—, sino justo
    *  después del párrafo que la llama: así, al oírla, se sabe de qué habla. */
@@ -211,13 +220,16 @@
     let buf = '';
     let nivel = 0;
     let notas = [];
+    let vers = null;   // el número de versículo con que empieza el párrafo
     const suelta = () => {
       const t = buf.replace(/\s+/g, ' ').trim();
       buf = '';
       if (t && tieneLetra(t)) {
         if (nivel) L.h[L.t.length] = nivel;
+        if (vers && L.v) L.v[L.t.length] = vers;
         L.t.push(t);
       }
+      vers = null;
       for (const n of notas) {
         L.k[L.t.length] = 1;
         L.t.push(n);
@@ -255,6 +267,10 @@
           nivel = antes;
         } else {
           ancla(c);
+          // el número de versículo al empezar un párrafo: se ve, pero no
+          // se lee (va aparte, en L.v); a media frase se lee como siempre
+          const v = esVersiculo(c);
+          if (v && !buf.trim()) { vers = v; continue; }
           if (esNota(c, tag)) {
             const llama = tag === 'a' ? c : c.querySelector && c.querySelector('a[href]');
             const n = llama && textoDeNota(llama, ruta, L);
@@ -324,7 +340,7 @@
 
     // el texto, documento por documento, en el orden de lectura; todos
     // abiertos antes, que una nota puede estar en otro archivo
-    const L = { t: [], h: {}, k: {}, anclas: new Map(), inicios: new Map(),
+    const L = { t: [], h: {}, k: {}, v: {}, anclas: new Map(), inicios: new Map(),
       docs: new Map(), usadas: new WeakSet(), pags: [] };
     for (const it of orden) {
       const x = await texto(it.ruta);
@@ -391,6 +407,7 @@
       t: L.t,
       h: L.h,
       k: L.k,
+      v: L.v,
       paginas: L.pags.length > 1
         ? L.pags.sort((a, b) => a[0] - b[0] || a[1] - b[1]) : null
     };
@@ -813,7 +830,7 @@
   async function html(file) {
     const d = parsea(await decodifica(file), 'text/html');
     const ruta = 'libro.html';
-    const L = { t: [], h: {}, k: {}, anclas: new Map(), inicios: new Map(),
+    const L = { t: [], h: {}, k: {}, v: {}, anclas: new Map(), inicios: new Map(),
       docs: new Map([[ruta, d]]), usadas: new WeakSet(), pags: [] };
     aplana(d, ruta, L);
     if (!L.t.length) throw new Error('La página no trae texto que leer');
@@ -830,6 +847,7 @@
       t: L.t,
       h: L.h,
       k: L.k,
+      v: L.v,
       paginas: L.pags.length > 1 ? L.pags : null
     };
   }
